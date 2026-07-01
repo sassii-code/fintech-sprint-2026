@@ -31,3 +31,31 @@ async def extract_raw_text(file: UploadFile = File(...)):
         "char_count": len(text),
         "preview": text[:2000]
     }
+from app.services.llm_service import extract_structured_data
+
+@router.post("/structured")
+async def extract_structured(file: UploadFile = File(...)):
+    if not file.filename.endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Only PDF files accepted")
+
+    contents = await file.read()
+    text = ""
+    try:
+        doc = pymupdf.open(stream=contents, filetype="pdf")
+        for page in doc:
+            text += page.get_text()
+        doc.close()
+    except Exception:
+        with pdfplumber.open(io.BytesIO(contents)) as pdf:
+            for page in pdf.pages:
+                text += page.extract_text() or ""
+
+    if not text.strip():
+        raise HTTPException(status_code=422, detail="Could not extract text from PDF")
+
+    structured_data = extract_structured_data(text)
+
+    return {
+        "filename": file.filename,
+        "extracted_data": structured_data
+    }
