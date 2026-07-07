@@ -11,9 +11,13 @@ router = APIRouter(prefix="/extract", tags=["extraction"], dependencies=[Depends
 
 # ── shared helper ──
 async def pdf_to_text(file: UploadFile) -> str:
-    if not file.filename.endswith(".pdf"):
+    if not file.filename or not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files accepted")
+
     contents = await file.read()
+    if not contents:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty")
+
     text = ""
     try:
         doc = pymupdf.open(stream=contents, filetype="pdf")
@@ -21,9 +25,13 @@ async def pdf_to_text(file: UploadFile) -> str:
             text += page.get_text()
         doc.close()
     except Exception:
-        with pdfplumber.open(io.BytesIO(contents)) as pdf:
-            for page in pdf.pages:
-                text += page.extract_text() or ""
+        try:
+            with pdfplumber.open(io.BytesIO(contents)) as pdf:
+                for page in pdf.pages:
+                    text += page.extract_text() or ""
+        except Exception:
+            raise HTTPException(status_code=422, detail="Could not read PDF — file may be corrupted or malformed")
+
     if not text.strip():
         raise HTTPException(status_code=422, detail="Could not extract text from PDF")
     return text
