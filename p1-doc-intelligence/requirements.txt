@@ -1,16 +1,11 @@
-# Directly imported in app/
-fastapi==0.139.0
-sqlalchemy==2.0.51
-pydantic==2.13.4
-python-dotenv==1.2.2
-python-jose[cryptography]==3.5.0
-passlib[bcrypt]==1.7.4
-pymupdf==1.28.0
-pdfplumber==0.11.10
-google-generativeai==0.8.6
-google-api-core==2.31.0
-
-# Required at runtime but not imported by name
-uvicorn==0.50.2          # ASGI server to run the app
-python-multipart==0.0.32 # needed by FastAPI for UploadFile/File
-psycopg2-binary==2.9.12  # driver for the postgresql:// DATABASE_URL
+fastapi
+uvicorn
+python-dotenv
+sqlalchemy
+psycopg2-binary
+pymupdf
+pdfplumber
+google-generativeai
+python-jose[cryptography]
+passlib[bcrypt]
+python-multipart
