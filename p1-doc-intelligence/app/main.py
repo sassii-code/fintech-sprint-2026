@@ -16,7 +16,10 @@ def startup_event():
     create_tables()
 
 from app.routers import extract
+from app.routers import auth
+
 app.include_router(extract.router)
+app.include_router(auth.router)
 
 @app.get("/")
 def root():

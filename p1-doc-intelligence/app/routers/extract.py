@@ -6,8 +6,8 @@ import io
 import json
 from app.services.llm_service import extract_structured_data
 from app.models.database import get_db, Extraction
-
-router = APIRouter(prefix="/extract", tags=["extraction"])
+from app.services.auth_service import verify_token
+router = APIRouter(prefix="/extract", tags=["extraction"], dependencies=[Depends(verify_token)])
 
 # ── shared helper ──
 async def pdf_to_text(file: UploadFile) -> str:
@@ -65,7 +65,10 @@ async def extract_invoice(file: UploadFile = File(...), db: Session = Depends(ge
     return {"id": record.id, "filename": file.filename, "doc_type": "invoice", "extracted_data": data}
 
 @router.post("/auto")
-async def extract_auto(file: UploadFile = File(...), db: Session = Depends(get_db)):
+async def extract_auto(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
     text = await pdf_to_text(file)
     text_lower = text.lower()
     if any(w in text_lower for w in ["experience", "education", "skills", "resume", "cv"]):
@@ -82,7 +85,6 @@ async def extract_auto(file: UploadFile = File(...), db: Session = Depends(get_d
     db.commit()
     db.refresh(record)
     return {"id": record.id, "filename": file.filename, "doc_type": doc_type, "extracted_data": data}
-
 @router.get("/history")
 async def get_history(db: Session = Depends(get_db)):
     records = db.query(Extraction).order_by(Extraction.created_at.desc()).limit(20).all()
