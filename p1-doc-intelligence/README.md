@@ -1,16 +1,60 @@
-# AI Document Intelligence API
+<div align="center">
 
-Extracts structured JSON (name, transactions, line items, etc.) from financial PDFs — resumes, bank statements, and invoices — using the Gemini LLM. Endpoints are JWT-protected and extraction history is persisted to PostgreSQL.
+<img src="docs/assets/banner.svg" alt="AI Document Intelligence API" width="100%" />
 
-**Live demo:** _coming soon_
+**Extract structured JSON from resumes, bank statements, and invoices — powered by Gemini.**
 
-## Stack
+![Python](https://img.shields.io/badge/python-3.13-3776AB?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.139-009688?logo=fastapi&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-SQLAlchemy-336791?logo=postgresql&logoColor=white)
+![Gemini](https://img.shields.io/badge/Google-Gemini_2.5_Flash-4285F4?logo=googlegemini&logoColor=white)
+![JWT](https://img.shields.io/badge/Auth-JWT-000000?logo=jsonwebtokens&logoColor=white)
+![Render](https://img.shields.io/badge/Deploy-Render-46E3B7?logo=render&logoColor=white)
 
-- **FastAPI** — HTTP API
-- **PostgreSQL + SQLAlchemy** — extraction history storage
-- **Google Gemini** (`gemini-2.5-flash`) — structured data extraction
-- **PyMuPDF / pdfplumber** — PDF text extraction (with fallback between the two)
-- **JWT** (`python-jose`) + `passlib` — auth
+[**Live Demo**](#) · [API Reference](#api-reference) · [Setup](#setup)
+
+</div>
+
+---
+
+## Live Demo
+
+> 🚧 _Not yet deployed — link will be added here once live on Render._
+
+## Features
+
+- 📄 **Multi-document extraction** — dedicated endpoints for resumes, bank statements, and invoices, plus an `/auto` endpoint that detects document type from content
+- 🤖 **LLM-powered** — Gemini 2.5 Flash turns raw PDF text into structured JSON against a per-document-type schema
+- 🔐 **JWT-protected API** — every extraction endpoint requires a bearer token issued via `/auth/token`
+- 🗄️ **Persistent history** — every extraction is saved to PostgreSQL and retrievable via `/extract/history`
+- 🛡️ **Resilient by design** — empty files, corrupt PDFs, LLM timeouts, and malformed LLM output all return clean, typed error responses instead of crashing
+- ☁️ **Deploy-ready** — `Procfile` + environment-driven config (`$PORT`, `$DATABASE_URL`) for one-click deploy to Render
+
+## Architecture
+
+```mermaid
+flowchart LR
+    Client(["Client"])
+
+    subgraph API["FastAPI app"]
+        Auth["/auth/token\n(JWT issuance)"]
+        Extract["/extract/*\n(JWT-protected)"]
+        PDF["pdf_to_text()\nPyMuPDF → pdfplumber fallback"]
+    end
+
+    Gemini[("Google Gemini\n2.5 Flash")]
+    DB[("PostgreSQL\nextractions table")]
+
+    Client -- "1. client_id/secret" --> Auth
+    Auth -- "JWT" --> Client
+    Client -- "2. PDF + Bearer token" --> Extract
+    Extract --> PDF
+    PDF -- "raw text" --> Extract
+    Extract -- "prompt" --> Gemini
+    Gemini -- "structured JSON" --> Extract
+    Extract -- "persist" --> DB
+    Extract -- "3. extracted_data" --> Client
+```
 
 ## Setup
 
@@ -34,31 +78,44 @@ Extracts structured JSON (name, transactions, line items, etc.) from financial P
    SECRET_KEY=a-long-random-secret-for-signing-jwts
    ```
    - `GEMINI_API_KEY` — from [Google AI Studio](https://aistudio.google.com/apikey)
-   - `DATABASE_URL` — a running PostgreSQL instance; the database itself must already exist
+   - `DATABASE_URL` — a running PostgreSQL instance; the database itself must already exist. `postgres://` URLs (e.g. from Render) are normalized to `postgresql://` automatically.
    - `SECRET_KEY` — if omitted, falls back to an insecure hardcoded dev default — always set this outside local dev
 
 4. **Run the server**
    ```bash
    uvicorn app.main:app --reload
    ```
-   Tables are created automatically on startup. API docs (Swagger UI) are available at `http://localhost:8000/docs`.
+   Tables are created automatically on startup.
+
+5. **Explore the API** — interactive Swagger UI is served at `http://localhost:8000/docs`:
+
+   <img src="docs/assets/swagger-ui.png" alt="Swagger UI — full endpoint list" width="100%" />
+
+   Expand any endpoint to try it directly from the browser — request bodies, parameters, and response schemas included:
+
+   <img src="docs/assets/swagger-ui-detail.png" alt="Swagger UI — expanded endpoint detail" width="100%" />
 
 ## Authentication
 
 All `/extract/*` endpoints require a bearer token. Get one from `/auth/token` using a registered client:
 
+**Request**
 ```bash
 curl -X POST http://localhost:8000/auth/token \
   -H "Content-Type: application/json" \
   -d '{"client_id": "client_demo", "client_secret": "demo123"}'
 ```
 
-Response:
+**Response**
 ```json
-{ "access_token": "<jwt>", "token_type": "bearer", "expires_in": "30 days" }
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "bearer",
+  "expires_in": "30 days"
+}
 ```
 
-Registered clients are currently hardcoded in `app/routers/auth.py` (`client_demo` / `client_tanishka`) — replace with a real client store before production use.
+Registered clients are currently hardcoded in `app/routers/auth.py` — replace with a real client store before production use.
 
 Pass the token on every subsequent request:
 ```
@@ -68,38 +125,127 @@ Authorization: Bearer <jwt>
 ## API Reference
 
 ### `POST /auth/token`
-Exchange `client_id` / `client_secret` for a JWT (30-day expiry).
+Exchange `client_id` / `client_secret` for a JWT (30-day expiry). See [Authentication](#authentication) above.
 
 ### `POST /extract/raw-text`
-Extract raw text from a PDF, no LLM involved.
-- Body: `multipart/form-data`, field `file` (PDF)
-- Response: `{ filename, char_count, preview }`
+Extract raw text from a PDF — no LLM involved.
+
+**Request**
+```bash
+curl -X POST http://localhost:8000/extract/raw-text \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "file=@document.pdf"
+```
+
+**Response**
+```json
+{
+  "filename": "document.pdf",
+  "char_count": 1532,
+  "preview": "First 2000 characters of extracted text..."
+}
+```
 
 ### `POST /extract/resume`
-Extract structured resume data: name, email, phone, education, experience, skills.
+Extract structured resume data.
+
+**Request**
+```bash
+curl -X POST http://localhost:8000/extract/resume \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "file=@resume.pdf"
+```
+
+**Response**
+```json
+{
+  "id": 5,
+  "filename": "resume.pdf",
+  "doc_type": "resume",
+  "extracted_data": {
+    "name": "Jane Doe",
+    "email": "jane@example.com",
+    "phone": "+1-555-0100",
+    "education": [
+      { "institution": "State University", "degree": "B.S. Computer Science", "duration": "2018–2022" }
+    ],
+    "experience": [
+      { "company": "Acme Corp", "position": "Software Engineer", "duration": "2022–Present", "achievements": ["Shipped X", "Improved Y by 30%"] }
+    ],
+    "skills": ["Python", "SQL", "FastAPI"]
+  }
+}
+```
 
 ### `POST /extract/bank-statement`
-Extract account holder/number, bank name, transactions, opening/closing balance, totals.
+Extract account holder/number, bank name, transactions, and balances.
+
+**Response shape**
+```json
+{
+  "id": 6,
+  "filename": "statement.pdf",
+  "doc_type": "bank_statement",
+  "extracted_data": {
+    "account_holder": "Jane Doe",
+    "account_number": "****1234",
+    "bank_name": "First National Bank",
+    "transactions": [
+      { "date": "2026-06-01", "description": "Grocery Store", "debit": 54.20, "credit": null }
+    ],
+    "opening_balance": 1200.00,
+    "closing_balance": 1145.80,
+    "total_debits": 54.20,
+    "total_credits": 0.00
+  }
+}
+```
 
 ### `POST /extract/invoice`
-Extract vendor info, invoice number/dates, line items, subtotal, tax, total.
+Extract vendor info, line items, and totals.
+
+**Response shape**
+```json
+{
+  "id": 7,
+  "filename": "invoice.pdf",
+  "doc_type": "invoice",
+  "extracted_data": {
+    "vendor_name": "Acme Supplies",
+    "vendor_address": "123 Market St",
+    "invoice_number": "INV-1042",
+    "invoice_date": "2026-06-01",
+    "due_date": "2026-06-30",
+    "line_items": [
+      { "description": "Widgets", "quantity": 10, "unit_price": 5.00, "total": 50.00 }
+    ],
+    "subtotal": 50.00,
+    "tax": 4.50,
+    "total_amount": 54.50,
+    "currency": "USD"
+  }
+}
+```
 
 ### `POST /extract/auto`
-Auto-detects document type (resume / bank statement / invoice / general) from content keywords, then extracts accordingly.
-
-All four extraction endpoints above:
-- Body: `multipart/form-data`, field `file` (PDF)
-- Response: `{ id, filename, doc_type, extracted_data }`
-- Persist the result to PostgreSQL
+Auto-detects document type (resume / bank statement / invoice / general) from content keywords, then extracts accordingly. Same request/response shape as the endpoints above, with `doc_type` reflecting what was detected.
 
 ### `GET /extract/history`
-Returns the 20 most recent extractions (id, filename, doc_type, created_at).
+Returns the 20 most recent extractions.
+
+**Response**
+```json
+[
+  { "id": 7, "filename": "invoice.pdf", "doc_type": "invoice", "created_at": "2026-07-07T10:15:00" },
+  { "id": 6, "filename": "statement.pdf", "doc_type": "bank_statement", "created_at": "2026-07-07T10:12:00" }
+]
+```
 
 ### `GET /extract/history/{id}`
-Returns a single extraction record, including its full `extracted_data`.
+Returns a single extraction record, including its full `extracted_data`. `404` if not found.
 
 ### `GET /health`
-Basic liveness check — `{ api, db, llm }`.
+Basic liveness check — `{ "api": "ok", "db": "ok", "llm": "ok" }`.
 
 ## Error Handling
 
@@ -111,3 +257,14 @@ Basic liveness check — `{ api, db, llm }`.
 | Extraction record not found (`/history/{id}`) | `404` |
 | Gemini request times out | `504` |
 | Gemini API error, blocked response, or malformed JSON output | `502` |
+
+## Tech Stack
+
+| Layer | Choice |
+|---|---|
+| API framework | FastAPI + Uvicorn |
+| PDF parsing | PyMuPDF (primary), pdfplumber (fallback) |
+| LLM extraction | Google Gemini 2.5 Flash |
+| Database | PostgreSQL via SQLAlchemy |
+| Auth | JWT (`python-jose`) + `passlib` |
+| Deployment | Render (`Procfile`, env-driven config) |

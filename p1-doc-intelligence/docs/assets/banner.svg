@@ -1,0 +1,41 @@
+<svg width="1200" height="260" viewBox="0 0 1200 260" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#1e293b"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#818cf8"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="260" rx="16" fill="url(#bg)"/>
+
+  <!-- document icon -->
+  <g transform="translate(70,68)">
+    <rect x="0" y="0" width="90" height="120" rx="10" fill="#1e293b" stroke="url(#accent)" stroke-width="3"/>
+    <line x1="16" y1="30" x2="74" y2="30" stroke="#38bdf8" stroke-width="4" stroke-linecap="round"/>
+    <line x1="16" y1="52" x2="74" y2="52" stroke="#38bdf8" stroke-width="4" stroke-linecap="round" opacity="0.75"/>
+    <line x1="16" y1="74" x2="58" y2="74" stroke="#38bdf8" stroke-width="4" stroke-linecap="round" opacity="0.55"/>
+    <circle cx="80" cy="98" r="26" fill="#0f172a" stroke="url(#accent)" stroke-width="3"/>
+    <path d="M70 98 l7 7 l14 -14" fill="none" stroke="#38bdf8" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+
+  <text x="200" y="118" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="46" font-weight="700" fill="#f8fafc">
+    AI Document Intelligence API
+  </text>
+  <text x="202" y="156" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="20" fill="#94a3b8">
+    Turn resumes, bank statements &amp; invoices into structured JSON — powered by Gemini
+  </text>
+
+  <g font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" fill="#38bdf8">
+    <text x="202" y="196">FastAPI</text>
+    <text x="280" y="196" fill="#475569">·</text>
+    <text x="296" y="196">PostgreSQL</text>
+    <text x="404" y="196" fill="#475569">·</text>
+    <text x="420" y="196">Gemini</text>
+    <text x="498" y="196" fill="#475569">·</text>
+    <text x="514" y="196">JWT Auth</text>
+  </g>
+</svg>
