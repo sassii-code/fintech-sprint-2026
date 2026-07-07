@@ -11,7 +11,7 @@
 ![JWT](https://img.shields.io/badge/Auth-JWT-000000?logo=jsonwebtokens&logoColor=white)
 ![Render](https://img.shields.io/badge/Deploy-Render-46E3B7?logo=render&logoColor=white)
 
-[**Live Demo**](#) · [API Reference](#api-reference) · [Setup](#setup)
+[**Live Demo**](https://fintech-sprint-2026.onrender.com) · [API Reference](#api-reference) · [Setup](#setup)
 
 </div>
 
@@ -19,7 +19,9 @@
 
 ## Live Demo
 
-> 🚧 _Not yet deployed — link will be added here once live on Render._
+**API:** [fintech-sprint-2026.onrender.com](https://fintech-sprint-2026.onrender.com) · [Swagger UI](https://fintech-sprint-2026.onrender.com/docs)
+
+> Hosted on Render's free tier — the first request after a period of inactivity may take ~30s while the instance spins up.
 
 ## Features
 
