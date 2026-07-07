@@ -1,5 +1,6 @@
 import os
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from dotenv import load_dotenv
 from app.models.database import create_tables
@@ -10,6 +11,14 @@ app = FastAPI(
     title="AI Document Intelligence API",
     description="Extract structured JSON from financial documents",
     version="0.1.0"
+)
+
+# Frontend is served separately (see frontend/), so it needs CORS to call this API.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=os.getenv("CORS_ORIGINS", "*").split(","),
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 @app.on_event("startup")

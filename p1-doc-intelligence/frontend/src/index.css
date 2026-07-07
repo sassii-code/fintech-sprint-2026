@@ -1,0 +1,143 @@
+:root {
+  color-scheme: dark;
+  --bg: #0f172a;
+  --bg-elevated: #161f34;
+  --bg-inset: #0c1425;
+  --border: rgba(148, 163, 184, 0.15);
+  --border-hover: rgba(148, 163, 184, 0.32);
+  --text: #f8fafc;
+  --text-muted: #94a3b8;
+  --text-faint: #64748b;
+  --accent-a: #38bdf8;
+  --accent-b: #818cf8;
+  --accent-grad: linear-gradient(90deg, var(--accent-a), var(--accent-b));
+  --danger: #f87171;
+  --danger-bg: rgba(248, 113, 113, 0.1);
+  --success: #4ade80;
+  --radius: 10px;
+  --font: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+  --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: linear-gradient(160deg, #0f172a 0%, #131c33 100%);
+  color: var(--text);
+  font-family: var(--font);
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+::selection {
+  background: rgba(56, 189, 248, 0.3);
+}
+
+.gradient-text {
+  background: var(--accent-grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  transition: opacity 0.15s ease;
+  white-space: nowrap;
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--accent-grad);
+  color: #0f172a;
+}
+
+.btn-primary:not(:disabled):hover {
+  opacity: 0.88;
+}
+
+.btn-ghost {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+}
+
+.btn-ghost:not(:disabled):hover {
+  border-color: var(--border-hover);
+  color: var(--text);
+}
+
+.input {
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.input:focus {
+  border-color: var(--accent-a);
+}
+
+.input::placeholder {
+  color: var(--text-faint);
+}
+
+code,
+pre {
+  font-family: var(--mono);
+}
+
+.layout-grid {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 760px) {
+  .layout-grid {
+    grid-template-columns: 1fr;
+  }
+}
