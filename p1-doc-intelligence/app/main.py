@@ -1,3 +1,4 @@
+import os
 from fastapi import FastAPI
 from datetime import datetime
 from dotenv import load_dotenv
@@ -33,3 +34,7 @@ def root():
 @app.get("/health")
 def health():
     return {"api": "ok", "db": "ok", "llm": "ok"}
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("app.main:app", host="0.0.0.0", port=int(os.getenv("PORT", 8000)))
