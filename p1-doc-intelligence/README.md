@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="docs/assets/banner.svg" alt="AI Document Intelligence API" width="100%" />
+<img src="docs/assets/banner.svg" alt="DocSense AI" width="100%" />
 
-**Extract structured JSON from resumes, bank statements, and invoices — powered by Gemini.**
+**DocSense AI** — extract structured JSON from resumes, bank statements, and invoices, powered by Gemini.
 
 ![Python](https://img.shields.io/badge/python-3.13-3776AB?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.139-009688?logo=fastapi&logoColor=white)
@@ -21,7 +21,7 @@
 
 **API:** [fintech-sprint-2026.onrender.com](https://fintech-sprint-2026.onrender.com) · [Swagger UI](https://fintech-sprint-2026.onrender.com/docs)
 
-> Hosted on Render's free tier — the first request after a period of inactivity may take ~30s while the instance spins up.
+> Hosted on Render's free tier. A [GitHub Actions workflow](../.github/workflows/keep-alive.yml) pings `/health` every 14 minutes to keep the instance from spinning down from inactivity; the frontend also pings `/health` on load and shows a live "Connecting… → Ready" status so a cold start is visible rather than silent.
 
 ## Features
 
@@ -32,7 +32,7 @@
 - 🔐 **JWT-protected API** — every extraction endpoint requires a bearer token issued via `/auth/token`
 - 🗄️ **Persistent history** — every extraction is saved to PostgreSQL and retrievable via `/extract/history`
 - 🛡️ **Resilient by design** — empty files, corrupt files, unsupported formats, LLM timeouts, and malformed LLM output all return clean, typed error responses instead of crashing
-- 💻 **React frontend** — drag-and-drop (single or batch) upload, template library, JSON/CSV export; see [`frontend/`](frontend/README.md)
+- 💻 **React frontend** — dark glassmorphic UI, drag-and-drop (single or batch) upload, template library, resizable/syntax-highlighted JSON viewer, JSON/CSV/Excel export, live server status; see [`frontend/`](frontend/README.md)
 - ☁️ **Deploy-ready** — `Procfile` + environment-driven config (`$PORT`, `$DATABASE_URL`) for one-click deploy to Render
 
 ## Architecture
