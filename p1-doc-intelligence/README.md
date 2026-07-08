@@ -278,6 +278,19 @@ Returns the 20 most recent extractions.
 ### `GET /extract/history/{id}`
 Returns a single extraction record, including its full `extracted_data`. `404` if not found.
 
+### `POST /extract/export`
+Takes one or more extraction results and returns a formatted `.xlsx` file (nested fields flattened to columns, bold header row, auto-sized columns). This is what powers the frontend's "Download Excel" buttons — CSV export, by contrast, happens entirely client-side with no backend call.
+
+**Request**
+```bash
+curl -X POST http://localhost:8000/extract/export \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"records":[{"filename":"invoice.pdf","doc_type":"invoice","extracted_data":{"vendor_name":"Acme","total_amount":542.10}}]}' \
+  -o export.xlsx
+```
+Returns the `.xlsx` file as a binary response (`Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`). `400` if `records` is empty.
+
 ### `GET /health`
 Basic liveness check — `{ "api": "ok", "db": "ok", "llm": "ok" }`.
 
@@ -300,6 +313,7 @@ Basic liveness check — `{ "api": "ok", "db": "ok", "llm": "ok" }`.
 | PDF parsing | PyMuPDF (primary), pdfplumber (fallback) |
 | Image text extraction | Gemini 2.5 Flash vision (multimodal) |
 | Word doc parsing | `python-docx` |
+| Excel export | `openpyxl` |
 | LLM extraction | Google Gemini 2.5 Flash |
 | Database | PostgreSQL via SQLAlchemy |
 | Auth | JWT (`python-jose`) + `passlib` |

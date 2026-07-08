@@ -8,8 +8,8 @@ Minimal React (Vite) UI for the [AI Document Intelligence API](../README.md).
 - **Multi-format** — accepts PDF, JPG, PNG, DOCX, TXT
 - **Document type selector** — Auto-detect, Resume, Invoice, Bank Statement, or Custom Fields
 - **Custom field extraction** — type any comma-separated field list, or start from a template (Invoice, Resume, Bank Statement, Receipt, Tax Form, Contract)
-- **Results view** — pretty-printed JSON with **Copy JSON** and **Download CSV** buttons
-- **Batch export** — download all results from a batch run as a single CSV
+- **Results view** — pretty-printed JSON with **Copy JSON**, **Download CSV** (instant, generated client-side), and **Download Excel** (calls the backend's `/extract/export`, formatted `.xlsx` via openpyxl) buttons
+- **Batch export** — download all results from a batch run as a single CSV or Excel file
 - **History panel** — browse and reload past extractions
 
 ## Setup
