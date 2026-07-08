@@ -1,6 +1,16 @@
 # Document Intelligence — Frontend
 
-Minimal React (Vite) UI for the [AI Document Intelligence API](../README.md): drag-and-drop PDF upload, document type selection, JSON results view, and extraction history.
+Minimal React (Vite) UI for the [AI Document Intelligence API](../README.md).
+
+## Features
+
+- **Single or batch upload** — drag-and-drop one file, or many at once with a per-file progress list
+- **Multi-format** — accepts PDF, JPG, PNG, DOCX, TXT
+- **Document type selector** — Auto-detect, Resume, Invoice, Bank Statement, or Custom Fields
+- **Custom field extraction** — type any comma-separated field list, or start from a template (Invoice, Resume, Bank Statement, Receipt, Tax Form, Contract)
+- **Results view** — pretty-printed JSON with **Copy JSON** and **Download CSV** buttons
+- **Batch export** — download all results from a batch run as a single CSV
+- **History panel** — browse and reload past extractions
 
 ## Setup
 

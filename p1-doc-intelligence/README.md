@@ -26,22 +26,25 @@
 ## Features
 
 - 📄 **Multi-document extraction** — dedicated endpoints for resumes, bank statements, and invoices, plus an `/auto` endpoint that detects document type from content
-- 🤖 **LLM-powered** — Gemini 2.5 Flash turns raw PDF text into structured JSON against a per-document-type schema
+- 🧩 **Custom field extraction** — `/extract/custom` lets callers specify exactly which fields to pull out of a document, no fixed schema required
+- 🖼️ **Multi-format ingestion** — PDF, JPG/PNG (via Tesseract OCR), DOCX, and TXT all go through the same extraction pipeline
+- 🤖 **LLM-powered** — Gemini 2.5 Flash turns raw document text into structured JSON against a per-document-type (or custom) schema
 - 🔐 **JWT-protected API** — every extraction endpoint requires a bearer token issued via `/auth/token`
 - 🗄️ **Persistent history** — every extraction is saved to PostgreSQL and retrievable via `/extract/history`
-- 🛡️ **Resilient by design** — empty files, corrupt PDFs, LLM timeouts, and malformed LLM output all return clean, typed error responses instead of crashing
+- 🛡️ **Resilient by design** — empty files, corrupt files, unsupported formats, LLM timeouts, and malformed LLM output all return clean, typed error responses instead of crashing
+- 💻 **React frontend** — drag-and-drop (single or batch) upload, template library, JSON/CSV export; see [`frontend/`](frontend/README.md)
 - ☁️ **Deploy-ready** — `Procfile` + environment-driven config (`$PORT`, `$DATABASE_URL`) for one-click deploy to Render
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-    Client(["Client"])
+    Client(["Client / React frontend"])
 
     subgraph API["FastAPI app"]
         Auth["/auth/token\n(JWT issuance)"]
         Extract["/extract/*\n(JWT-protected)"]
-        PDF["pdf_to_text()\nPyMuPDF → pdfplumber fallback"]
+        FileToText["file_to_text()\nPDF · image (OCR) · DOCX · TXT"]
     end
 
     Gemini[("Google Gemini\n2.5 Flash")]
@@ -49,14 +52,16 @@ flowchart LR
 
     Client -- "1. client_id/secret" --> Auth
     Auth -- "JWT" --> Client
-    Client -- "2. PDF + Bearer token" --> Extract
-    Extract --> PDF
-    PDF -- "raw text" --> Extract
+    Client -- "2. file + doc_type or custom fields" --> Extract
+    Extract --> FileToText
+    FileToText -- "raw text" --> Extract
     Extract -- "prompt" --> Gemini
     Gemini -- "structured JSON" --> Extract
     Extract -- "persist" --> DB
     Extract -- "3. extracted_data" --> Client
 ```
+
+> **OCR note:** image extraction (`.jpg`/`.png`) depends on the Tesseract OCR binary being present on the host. It's not installed on the current Render deployment (Render's native Python runtime doesn't include it), so image uploads there will return a `503` until the service is switched to a Docker-based deploy with Tesseract installed. PDF, DOCX, and TXT are unaffected — they're pure-Python.
 
 ## Setup
 
@@ -129,8 +134,10 @@ Authorization: Bearer <jwt>
 ### `POST /auth/token`
 Exchange `client_id` / `client_secret` for a JWT (30-day expiry). See [Authentication](#authentication) above.
 
+All `/extract/*` endpoints below accept **PDF, JPG, PNG, DOCX, or TXT** — the file extension determines how text is pulled out (PyMuPDF/pdfplumber for PDF, Tesseract OCR for images, python-docx for Word, plain decode for text) before it's handed to Gemini.
+
 ### `POST /extract/raw-text`
-Extract raw text from a PDF — no LLM involved.
+Extract raw text from a document — no LLM involved.
 
 **Request**
 ```bash
@@ -229,6 +236,33 @@ Extract vendor info, line items, and totals.
 }
 ```
 
+### `POST /extract/custom`
+Extract an arbitrary, caller-specified set of fields instead of a fixed schema — the basis for the frontend's template library.
+
+**Request**
+```bash
+curl -X POST http://localhost:8000/extract/custom \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "file=@receipt.jpg" \
+  -F "fields=merchant_name, date, total, payment_method"
+```
+
+**Response**
+```json
+{
+  "id": 8,
+  "filename": "receipt.jpg",
+  "doc_type": "custom",
+  "extracted_data": {
+    "merchant_name": "Corner Cafe",
+    "date": "2026-07-01",
+    "total": 14.50,
+    "payment_method": "card"
+  }
+}
+```
+`fields` is a comma-separated string; fields not found in the document come back as `null`. Returns `400` if `fields` is empty.
+
 ### `POST /extract/auto`
 Auto-detects document type (resume / bank statement / invoice / general) from content keywords, then extracts accordingly. Same request/response shape as the endpoints above, with `doc_type` reflecting what was detected.
 
@@ -254,8 +288,9 @@ Basic liveness check — `{ "api": "ok", "db": "ok", "llm": "ok" }`.
 | Situation | Status |
 |---|---|
 | Missing/invalid bearer token | `401` |
-| No file, empty file, or non-PDF extension | `400` |
-| PDF fails to parse (corrupt/malformed) or has no extractable text | `422` |
+| No file, empty file, unsupported extension, or empty `fields` on `/extract/custom` | `400` |
+| File fails to parse (corrupt/malformed) or has no extractable text | `422` |
+| OCR engine (Tesseract) not available on the host | `503` |
 | Extraction record not found (`/history/{id}`) | `404` |
 | Gemini request times out | `504` |
 | Gemini API error, blocked response, or malformed JSON output | `502` |
@@ -266,7 +301,10 @@ Basic liveness check — `{ "api": "ok", "db": "ok", "llm": "ok" }`.
 |---|---|
 | API framework | FastAPI + Uvicorn |
 | PDF parsing | PyMuPDF (primary), pdfplumber (fallback) |
+| Image OCR | Tesseract via `pytesseract` |
+| Word doc parsing | `python-docx` |
 | LLM extraction | Google Gemini 2.5 Flash |
 | Database | PostgreSQL via SQLAlchemy |
 | Auth | JWT (`python-jose`) + `passlib` |
+| Frontend | React + Vite (see [`frontend/`](frontend/README.md)) |
 | Deployment | Render (`Procfile`, env-driven config) |
