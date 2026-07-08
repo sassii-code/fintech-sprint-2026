@@ -74,7 +74,7 @@ export default function ResultsView({ loading, error, result, token }) {
   return (
     <div className="split-view slide-in">
       {/* ── document info ── */}
-      <div className="card" style={{ padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
+      <div className="split-view-side card" style={{ padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
         <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
           <div
             style={{
@@ -153,7 +153,7 @@ export default function ResultsView({ loading, error, result, token }) {
       </div>
 
       {/* ── extracted JSON ── */}
-      <div className="card" style={{ padding: 20 }}>
+      <div className="split-view-main card" style={{ padding: 20, minWidth: 0, maxWidth: "100%" }}>
         <div style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--text-muted)", marginBottom: 10, textTransform: "uppercase", letterSpacing: 0.5 }}>
           Extracted Data
         </div>

@@ -24,10 +24,11 @@ export default function Header({ authenticated, onLogout, serverStatus }) {
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          gap: 16,
+          flexWrap: "wrap",
+          gap: 12,
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
           <div
             style={{
               width: 34,
@@ -50,7 +51,7 @@ export default function Header({ authenticated, onLogout, serverStatus }) {
           </div>
         </div>
 
-        <nav style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <nav style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           <StatusIndicator status={serverStatus} />
           <a
             href={`${API_BASE_URL}/docs`}
