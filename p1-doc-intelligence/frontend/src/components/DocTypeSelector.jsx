@@ -14,9 +14,10 @@ export default function DocTypeSelector({ value, onChange }) {
             style={{
               padding: "8px 16px",
               fontSize: "0.85rem",
-              background: active ? "var(--accent-grad)" : "transparent",
-              color: active ? "#0f172a" : "var(--text-muted)",
-              border: active ? "none" : "1px solid var(--border)",
+              background: active ? "var(--accent-grad)" : "rgba(255,255,255,0.03)",
+              color: active ? "#fff" : "var(--text-muted)",
+              border: active ? "none" : "1px solid var(--glass-border)",
+              boxShadow: active ? "0 4px 14px -4px rgba(99,102,241,0.5)" : "none",
             }}
           >
             {type.label}

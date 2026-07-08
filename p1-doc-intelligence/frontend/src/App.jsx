@@ -1,17 +1,36 @@
-import { useCallback, useEffect, useState } from "react";
-import { API_BASE_URL, extractDocument, getExtraction, getHistory } from "./api";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
+import { LayoutGrid, Layers, Zap } from "lucide-react";
+import { extractDocument, getExtraction, getHistory } from "./api";
+import { useToast } from "./ToastContext";
+import { useServerStatus } from "./useServerStatus";
 import LoginBar from "./components/LoginBar";
+import Header from "./components/Header";
+import Footer from "./components/Footer";
 import Dropzone from "./components/Dropzone";
 import BatchDropzone from "./components/BatchDropzone";
-import BatchResults from "./components/BatchResults";
 import DocTypeSelector from "./components/DocTypeSelector";
 import CustomFieldsInput from "./components/CustomFieldsInput";
-import ResultsView from "./components/ResultsView";
-import HistoryPanel from "./components/HistoryPanel";
+import Skeleton from "./components/Skeleton";
+
+// Not needed for first paint (only render once an extraction exists / history
+// loads), so they're split into their own chunks and fetched on demand.
+const ResultsView = lazy(() => import("./components/ResultsView"));
+const BatchResults = lazy(() => import("./components/BatchResults"));
+const HistoryPanel = lazy(() => import("./components/HistoryPanel"));
 
 const TOKEN_KEY = "doc_intel_token";
 
+function PanelSkeleton({ height = 200 }) {
+  return (
+    <div className="card" style={{ padding: 20 }}>
+      <Skeleton height={height} />
+    </div>
+  );
+}
+
 function App() {
+  const toast = useToast();
+  const serverStatus = useServerStatus();
   const [token, setToken] = useState(() => localStorage.getItem(TOKEN_KEY));
 
   const [mode, setMode] = useState("single"); // "single" | "batch"
@@ -65,6 +84,7 @@ function App() {
   function handleAuthenticated(newToken) {
     localStorage.setItem(TOKEN_KEY, newToken);
     setToken(newToken);
+    toast("Signed in successfully", "success");
   }
 
   function handleLogout() {
@@ -80,6 +100,7 @@ function App() {
     setFileError(error);
     setResult(null);
     setResultError(null);
+    if (error) toast(error, "error");
   }
 
   function requiresFields() {
@@ -96,6 +117,7 @@ function App() {
       const data = await extractDocument(docType, file, token, customFields);
       setResult(data);
       setSelectedId(data.id ?? null);
+      toast("Extraction complete", "success");
       loadHistory();
     } catch (err) {
       if (err.status === 401) {
@@ -103,6 +125,7 @@ function App() {
         return;
       }
       setResultError(err.message);
+      toast(`Extraction failed: ${err.message}`, "error", 5000);
     } finally {
       setExtracting(false);
     }
@@ -117,6 +140,7 @@ function App() {
       setResult(data);
     } catch (err) {
       setResultError(err.message);
+      toast(err.message, "error");
     } finally {
       setExtracting(false);
     }
@@ -151,115 +175,128 @@ function App() {
     }
 
     setBatchRunning(false);
+    toast("Batch extraction complete", "success");
     loadHistory();
   }
 
   if (!token) {
-    return <LoginBar onAuthenticated={handleAuthenticated} />;
+    return (
+      <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+        <Header authenticated={false} serverStatus={serverStatus} />
+        <div style={{ flex: 1 }}>
+          <LoginBar onAuthenticated={handleAuthenticated} />
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div style={{ maxWidth: 1080, margin: "0 auto", padding: "32px 20px 60px" }}>
-      <header
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 28,
-          flexWrap: "wrap",
-          gap: 12,
-        }}
-      >
-        <div>
-          <h1 style={{ fontSize: "1.4rem", margin: 0 }}>
-            <span className="gradient-text">Document Intelligence</span>
+    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+      <Header authenticated={!!token} onLogout={handleLogout} serverStatus={serverStatus} />
+
+      <main style={{ flex: 1, maxWidth: 1180, margin: "0 auto", padding: "36px 20px 20px", width: "100%" }}>
+        {/* ── hero / upload section ── */}
+        <div className="fade-in" style={{ textAlign: "center", marginBottom: 28 }}>
+          <h1 style={{ fontSize: "1.7rem", margin: "0 0 6px", fontWeight: 700 }}>
+            Extract structured data from <span className="gradient-text">any document</span>
           </h1>
-          <div style={{ fontSize: "0.75rem", color: "var(--text-faint)", marginTop: 2 }}>
-            {API_BASE_URL}
-          </div>
+          <p style={{ color: "var(--text-muted)", fontSize: "0.92rem", margin: 0 }}>
+            Drop a file, pick a template or write your own fields, get clean JSON back.
+          </p>
         </div>
-        <button className="btn btn-ghost" onClick={handleLogout}>
-          Sign out
-        </button>
-      </header>
 
-      <div className="layout-grid">
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <div className="card" style={{ padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
-              <DocTypeSelector value={docType} onChange={setDocType} />
-              <div style={{ display: "flex", gap: 6 }}>
-                {["single", "batch"].map((m) => (
-                  <button
-                    key={m}
-                    className="btn"
-                    onClick={() => setMode(m)}
-                    style={{
-                      padding: "6px 14px",
-                      fontSize: "0.78rem",
-                      background: mode === m ? "var(--accent-grad)" : "transparent",
-                      color: mode === m ? "#0f172a" : "var(--text-muted)",
-                      border: mode === m ? "none" : "1px solid var(--border)",
-                    }}
-                  >
-                    {m === "single" ? "Single" : "Batch"}
-                  </button>
-                ))}
-              </div>
+        <div className="card fade-in" style={{ padding: 24, maxWidth: 760, margin: "0 auto 24px", display: "flex", flexDirection: "column", gap: 16 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+            <DocTypeSelector value={docType} onChange={setDocType} />
+            <div style={{ display: "flex", gap: 6, background: "var(--bg-inset)", padding: 4, borderRadius: 10 }}>
+              {[
+                { id: "single", label: "Single", Icon: LayoutGrid },
+                { id: "batch", label: "Batch", Icon: Layers },
+              ].map(({ id, label, Icon }) => (
+                <button
+                  key={id}
+                  className="btn"
+                  onClick={() => setMode(id)}
+                  style={{
+                    padding: "6px 14px",
+                    fontSize: "0.78rem",
+                    background: mode === id ? "var(--accent-grad)" : "transparent",
+                    color: mode === id ? "#fff" : "var(--text-muted)",
+                    border: "none",
+                    boxShadow: mode === id ? "0 4px 14px -4px rgba(99,102,241,0.5)" : "none",
+                  }}
+                >
+                  <Icon size={13} />
+                  {label}
+                </button>
+              ))}
             </div>
-
-            {docType === "custom" && <CustomFieldsInput value={customFields} onChange={setCustomFields} />}
-
-            {mode === "single" ? (
-              <>
-                <Dropzone file={file} onFileSelected={handleFileSelected} />
-                {fileError && <div style={{ color: "var(--danger)", fontSize: "0.85rem" }}>{fileError}</div>}
-                <button
-                  className="btn btn-primary"
-                  disabled={!file || extracting || requiresFields()}
-                  onClick={handleExtract}
-                  style={{ alignSelf: "flex-start" }}
-                >
-                  {extracting ? "Extracting…" : "Extract document"}
-                </button>
-              </>
-            ) : (
-              <>
-                <BatchDropzone
-                  files={batchFiles}
-                  onFilesAdded={handleBatchFilesAdded}
-                  onRemove={handleBatchRemove}
-                  onClear={() => setBatchFiles([])}
-                  disabled={batchRunning}
-                />
-                <button
-                  className="btn btn-primary"
-                  disabled={batchFiles.length === 0 || batchRunning || requiresFields()}
-                  onClick={handleBatchExtract}
-                  style={{ alignSelf: "flex-start" }}
-                >
-                  {batchRunning ? "Extracting…" : `Extract ${batchFiles.length || ""} document(s)`}
-                </button>
-              </>
-            )}
           </div>
+
+          {docType === "custom" && <CustomFieldsInput value={customFields} onChange={setCustomFields} />}
 
           {mode === "single" ? (
-            <ResultsView loading={extracting} error={resultError} result={result} token={token} />
+            <>
+              <Dropzone file={file} onFileSelected={handleFileSelected} />
+              {fileError && <div style={{ color: "var(--danger)", fontSize: "0.85rem" }}>{fileError}</div>}
+              <button
+                className="btn btn-primary"
+                disabled={!file || extracting || requiresFields()}
+                onClick={handleExtract}
+                style={{ alignSelf: "center", padding: "12px 32px" }}
+              >
+                <Zap size={16} />
+                {extracting ? "Extracting…" : "Extract document"}
+              </button>
+            </>
           ) : (
-            <BatchResults items={batchItems} running={batchRunning} token={token} />
+            <>
+              <BatchDropzone
+                files={batchFiles}
+                onFilesAdded={handleBatchFilesAdded}
+                onRemove={handleBatchRemove}
+                onClear={() => setBatchFiles([])}
+                disabled={batchRunning}
+              />
+              <button
+                className="btn btn-primary"
+                disabled={batchFiles.length === 0 || batchRunning || requiresFields()}
+                onClick={handleBatchExtract}
+                style={{ alignSelf: "center", padding: "12px 32px" }}
+              >
+                <Zap size={16} />
+                {batchRunning ? "Extracting…" : `Extract ${batchFiles.length || ""} document(s)`}
+              </button>
+            </>
           )}
         </div>
 
-        <HistoryPanel
-          items={history}
-          loading={historyLoading}
-          error={historyError}
-          selectedId={selectedId}
-          onSelect={handleSelectHistory}
-          onRefresh={() => loadHistory()}
-        />
-      </div>
+        {/* ── results + history ── */}
+        <div className="layout-grid">
+          <div>
+            <Suspense fallback={<PanelSkeleton height={220} />}>
+              {mode === "single" ? (
+                <ResultsView loading={extracting} error={resultError} result={result} token={token} />
+              ) : (
+                <BatchResults items={batchItems} running={batchRunning} token={token} />
+              )}
+            </Suspense>
+          </div>
+
+          <Suspense fallback={<PanelSkeleton height={320} />}>
+            <HistoryPanel
+              items={history}
+              loading={historyLoading}
+              error={historyError}
+              selectedId={selectedId}
+              onSelect={handleSelectHistory}
+              onRefresh={() => loadHistory()}
+            />
+          </Suspense>
+        </div>
+      </main>
+
+      <Footer />
     </div>
   );
 }

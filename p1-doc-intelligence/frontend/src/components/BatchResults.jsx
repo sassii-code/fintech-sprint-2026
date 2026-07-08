@@ -1,17 +1,19 @@
 import { useState } from "react";
+import { Download, Sheet, CheckCircle2, XCircle, Loader2, Clock } from "lucide-react";
 import { flattenObject, toCSV, downloadCSV, downloadBlob } from "../csv";
 import { exportToExcel } from "../api";
+import { useToast } from "../ToastContext";
 
-const STATUS_STYLE = {
-  queued: { label: "Queued", color: "var(--text-faint)" },
-  processing: { label: "Processing…", color: "var(--accent-a)" },
-  done: { label: "Done", color: "var(--success)" },
-  error: { label: "Failed", color: "var(--danger)" },
+const STATUS_META = {
+  queued: { label: "Queued", color: "var(--text-faint)", Icon: Clock },
+  processing: { label: "Processing…", color: "var(--accent-3)", Icon: Loader2, spin: true },
+  done: { label: "Done", color: "var(--success)", Icon: CheckCircle2 },
+  error: { label: "Failed", color: "var(--danger)", Icon: XCircle },
 };
 
 export default function BatchResults({ items, running, token }) {
+  const toast = useToast();
   const [exporting, setExporting] = useState(false);
-  const [exportError, setExportError] = useState(null);
 
   if (items.length === 0) return null;
 
@@ -24,26 +26,27 @@ export default function BatchResults({ items, running, token }) {
       .filter((i) => i.status === "done")
       .map((i) => ({ filename: i.file.name, doc_type: i.data.doc_type, ...flattenObject(i.data.extracted_data) }));
     downloadCSV("batch-extraction.csv", toCSV(rows));
+    toast("CSV downloaded", "success");
   }
 
   async function handleDownloadExcel() {
     setExporting(true);
-    setExportError(null);
     try {
       const records = items
         .filter((i) => i.status === "done")
         .map((i) => ({ filename: i.file.name, doc_type: i.data.doc_type ?? null, extracted_data: i.data.extracted_data }));
       const blob = await exportToExcel(records, token);
       downloadBlob("batch-extraction.xlsx", blob);
+      toast("Excel file downloaded", "success");
     } catch (err) {
-      setExportError(err.message);
+      toast(`Excel export failed: ${err.message}`, "error", 5000);
     } finally {
       setExporting(false);
     }
   }
 
   return (
-    <div className="card" style={{ padding: 20, display: "flex", flexDirection: "column", gap: 14 }}>
+    <div className="card slide-in" style={{ padding: 20, display: "flex", flexDirection: "column", gap: 14 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
         <span style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
           {running ? `Processing ${doneCount}/${items.length}…` : `${successCount}/${items.length} extracted successfully`}
@@ -51,7 +54,8 @@ export default function BatchResults({ items, running, token }) {
         {!running && successCount > 0 && (
           <div style={{ display: "flex", gap: 8 }}>
             <button className="btn btn-ghost" style={{ padding: "6px 14px", fontSize: "0.78rem" }} onClick={handleDownloadCSV}>
-              Download CSV (all)
+              <Download size={14} />
+              CSV (all)
             </button>
             <button
               className="btn btn-primary"
@@ -59,15 +63,12 @@ export default function BatchResults({ items, running, token }) {
               onClick={handleDownloadExcel}
               disabled={exporting}
             >
-              {exporting ? "Exporting…" : "Download Excel (all)"}
+              <Sheet size={14} />
+              {exporting ? "Exporting…" : "Excel (all)"}
             </button>
           </div>
         )}
       </div>
-
-      {exportError && (
-        <div style={{ color: "var(--danger)", fontSize: "0.8rem" }}>Excel export failed: {exportError}</div>
-      )}
 
       <div style={{ height: 6, background: "var(--bg-inset)", borderRadius: 999, overflow: "hidden" }}>
         <div
@@ -75,14 +76,16 @@ export default function BatchResults({ items, running, token }) {
             height: "100%",
             width: `${pct}%`,
             background: "var(--accent-grad)",
-            transition: "width 0.2s ease",
+            borderRadius: 999,
+            transition: "width 0.3s var(--ease)",
           }}
         />
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         {items.map((item, i) => {
-          const meta = STATUS_STYLE[item.status];
+          const meta = STATUS_META[item.status];
+          const Icon = meta.Icon;
           return (
             <div
               key={`${item.file.name}-${i}`}
@@ -91,15 +94,16 @@ export default function BatchResults({ items, running, token }) {
                 justifyContent: "space-between",
                 alignItems: "center",
                 fontSize: "0.82rem",
-                padding: "6px 10px",
-                borderRadius: 6,
+                padding: "8px 12px",
+                borderRadius: 8,
                 background: "var(--bg-inset)",
               }}
             >
               <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginRight: 12 }}>
                 {item.file.name}
               </span>
-              <span style={{ color: meta.color, fontWeight: 600, whiteSpace: "nowrap" }}>
+              <span style={{ color: meta.color, fontWeight: 600, whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 6 }}>
+                <Icon size={13} className={meta.spin ? "spin" : ""} />
                 {item.status === "error" ? item.error : meta.label}
               </span>
             </div>

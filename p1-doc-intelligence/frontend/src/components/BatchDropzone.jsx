@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { UploadCloud, X, Files } from "lucide-react";
 import { ACCEPT_ATTR, ACCEPTED_EXTENSIONS } from "../api";
 
 function extensionOf(name) {
@@ -23,7 +24,7 @@ export default function BatchDropzone({ files, onFilesAdded, onRemove, onClear, 
   return (
     <div>
       <div
-        className="card"
+        className={`card card-hover ${!disabled && files.length === 0 ? "pulse-idle" : ""}`}
         onClick={() => !disabled && inputRef.current?.click()}
         onDragOver={(e) => {
           e.preventDefault();
@@ -36,14 +37,16 @@ export default function BatchDropzone({ files, onFilesAdded, onRemove, onClear, 
           if (!disabled) addFiles(e.dataTransfer.files);
         }}
         style={{
-          padding: "36px 20px",
+          padding: "40px 20px",
           textAlign: "center",
           cursor: disabled ? "not-allowed" : "pointer",
           opacity: disabled ? 0.6 : 1,
           borderStyle: "dashed",
-          borderColor: dragging ? "var(--accent-a)" : "var(--border)",
-          background: dragging ? "rgba(56, 189, 248, 0.06)" : "var(--bg-elevated)",
-          transition: "border-color 0.15s ease, background 0.15s ease",
+          borderWidth: 1.5,
+          borderColor: dragging ? "var(--accent-1)" : "var(--glass-border)",
+          background: dragging ? "rgba(99, 102, 241, 0.08)" : "var(--glass)",
+          transform: dragging ? "scale(1.015)" : "scale(1)",
+          transition: "transform 0.2s var(--ease), border-color 0.2s var(--ease), background 0.2s var(--ease)",
         }}
       >
         <input
@@ -58,7 +61,20 @@ export default function BatchDropzone({ files, onFilesAdded, onRemove, onClear, 
             e.target.value = "";
           }}
         />
-        <div style={{ fontSize: "1.8rem", marginBottom: 8 }}>⬆️</div>
+        <div
+          style={{
+            width: 48,
+            height: 48,
+            margin: "0 auto 10px",
+            borderRadius: 14,
+            background: "rgba(99, 102, 241, 0.12)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <UploadCloud size={24} color="var(--accent-3)" />
+        </div>
         <div style={{ fontWeight: 600 }}>Drag & drop multiple files here</div>
         <div style={{ color: "var(--text-faint)", fontSize: "0.8rem", marginTop: 4 }}>
           or click to browse — PDF, JPG, PNG, DOCX, TXT
@@ -70,9 +86,11 @@ export default function BatchDropzone({ files, onFilesAdded, onRemove, onClear, 
       )}
 
       {files.length > 0 && (
-        <div className="card" style={{ marginTop: 12, padding: 12, display: "flex", flexDirection: "column", gap: 6 }}>
+        <div className="card fade-in" style={{ marginTop: 12, padding: 14, display: "flex", flexDirection: "column", gap: 6 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-            <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>{files.length} file(s) selected</span>
+            <span style={{ fontSize: "0.8rem", color: "var(--text-muted)", display: "flex", alignItems: "center", gap: 6 }}>
+              <Files size={13} /> {files.length} file(s) selected
+            </span>
             {!disabled && (
               <button className="btn btn-ghost" style={{ padding: "2px 10px", fontSize: "0.72rem" }} onClick={onClear}>
                 Clear all
@@ -87,17 +105,17 @@ export default function BatchDropzone({ files, onFilesAdded, onRemove, onClear, 
                 justifyContent: "space-between",
                 alignItems: "center",
                 fontSize: "0.82rem",
-                padding: "4px 0",
+                padding: "6px 4px",
               }}
             >
               <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.name}</span>
               {!disabled && (
                 <button
                   onClick={() => onRemove(i)}
-                  style={{ background: "none", border: "none", color: "var(--text-faint)", fontSize: "0.9rem" }}
+                  style={{ background: "none", border: "none", color: "var(--text-faint)", display: "flex" }}
                   aria-label={`Remove ${f.name}`}
                 >
-                  ✕
+                  <X size={14} />
                 </button>
               )}
             </div>
