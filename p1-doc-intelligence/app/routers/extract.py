@@ -1,11 +1,23 @@
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
+from pydantic import BaseModel
+from typing import Any, Optional
 import json
 from app.services.llm_service import extract_structured_data, extract_custom_fields
 from app.services.document_service import file_to_text
+from app.services.export_service import build_workbook
 from app.models.database import get_db, Extraction
 from app.services.auth_service import verify_token
 router = APIRouter(prefix="/extract", tags=["extraction"], dependencies=[Depends(verify_token)])
+
+class ExportRecord(BaseModel):
+    filename: str
+    doc_type: Optional[str] = None
+    extracted_data: dict[str, Any]
+
+class ExportRequest(BaseModel):
+    records: list[ExportRecord]
 
 # ── endpoints ──
 @router.post("/raw-text")
@@ -81,6 +93,21 @@ async def extract_auto(
     db.commit()
     db.refresh(record)
     return {"id": record.id, "filename": file.filename, "doc_type": doc_type, "extracted_data": data}
+@router.post("/export")
+async def export_extraction(request: ExportRequest):
+    if not request.records:
+        raise HTTPException(status_code=400, detail="No records to export")
+
+    records = [r.model_dump() for r in request.records]
+    buffer = build_workbook(records)
+
+    filename = "extraction-export.xlsx" if len(records) > 1 else f"{records[0]['filename']}.xlsx"
+    return StreamingResponse(
+        buffer,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )
+
 @router.get("/history")
 async def get_history(db: Session = Depends(get_db)):
     records = db.query(Extraction).order_by(Extraction.created_at.desc()).limit(20).all()
