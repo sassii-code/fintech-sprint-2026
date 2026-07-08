@@ -40,15 +40,13 @@ amounts_mentioned (list), summary (2 sentences).
 Return ONLY valid JSON, no markdown, no backticks."""
 }
 
-def _run_extraction(prompt: str, raw_text: str) -> dict:
-    full_prompt = f"{prompt}\n\nDocument text:\n{raw_text[:6000]}"
-
+def _generate(parts) -> str:
     try:
         response = model.generate_content(
-            full_prompt,
+            parts,
             request_options={"timeout": LLM_TIMEOUT_SECONDS}
         )
-        result = response.text
+        return response.text.strip()
     except DeadlineExceeded:
         raise HTTPException(status_code=504, detail="LLM request timed out, please try again")
     except GoogleAPIError as e:
@@ -57,7 +55,9 @@ def _run_extraction(prompt: str, raw_text: str) -> dict:
         # response had no usable candidate (e.g. blocked by safety filters)
         raise HTTPException(status_code=502, detail="LLM returned no usable output")
 
-    result = result.strip()
+def _run_extraction(prompt: str, raw_text: str) -> dict:
+    full_prompt = f"{prompt}\n\nDocument text:\n{raw_text[:6000]}"
+    result = _generate(full_prompt)
 
     # Clean markdown if Gemini adds it
     if result.startswith("```"):
@@ -83,3 +83,10 @@ def extract_custom_fields(raw_text: str, fields: list[str]) -> dict:
         "(use null for any field you cannot find). No markdown, no backticks."
     )
     return _run_extraction(prompt, raw_text)
+
+def transcribe_image(image) -> str:
+    prompt = (
+        "Transcribe all readable text from this image exactly as it appears. "
+        "Return only the raw transcribed text, no commentary, no markdown."
+    )
+    return _generate([prompt, image])

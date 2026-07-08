@@ -1,11 +1,11 @@
 import io
 import pymupdf
 import pdfplumber
-import pytesseract
 from PIL import Image, UnidentifiedImageError
 from docx import Document as DocxDocument
 from docx.opc.exceptions import PackageNotFoundError
 from fastapi import HTTPException, UploadFile
+from app.services.llm_service import transcribe_image
 
 
 def extract_text_from_pdf(contents: bytes) -> str:
@@ -28,13 +28,11 @@ def extract_text_from_pdf(contents: bytes) -> str:
 def extract_text_from_image(contents: bytes) -> str:
     try:
         image = Image.open(io.BytesIO(contents))
-    except UnidentifiedImageError:
+        image.load()  # force decode now so corrupt/truncated images fail here, not mid-request to Gemini
+    except (UnidentifiedImageError, OSError):
         raise HTTPException(status_code=422, detail="Could not read image — file may be corrupted or malformed")
 
-    try:
-        return pytesseract.image_to_string(image)
-    except pytesseract.TesseractNotFoundError:
-        raise HTTPException(status_code=503, detail="OCR engine is not available on this server")
+    return transcribe_image(image)
 
 
 def extract_text_from_docx(contents: bytes) -> str:

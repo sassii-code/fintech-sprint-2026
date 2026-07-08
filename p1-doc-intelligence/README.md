@@ -27,7 +27,7 @@
 
 - 📄 **Multi-document extraction** — dedicated endpoints for resumes, bank statements, and invoices, plus an `/auto` endpoint that detects document type from content
 - 🧩 **Custom field extraction** — `/extract/custom` lets callers specify exactly which fields to pull out of a document, no fixed schema required
-- 🖼️ **Multi-format ingestion** — PDF, JPG/PNG (via Tesseract OCR), DOCX, and TXT all go through the same extraction pipeline
+- 🖼️ **Multi-format ingestion** — PDF, JPG/PNG (transcribed via Gemini's vision capability), DOCX, and TXT all go through the same extraction pipeline
 - 🤖 **LLM-powered** — Gemini 2.5 Flash turns raw document text into structured JSON against a per-document-type (or custom) schema
 - 🔐 **JWT-protected API** — every extraction endpoint requires a bearer token issued via `/auth/token`
 - 🗄️ **Persistent history** — every extraction is saved to PostgreSQL and retrievable via `/extract/history`
@@ -44,7 +44,7 @@ flowchart LR
     subgraph API["FastAPI app"]
         Auth["/auth/token\n(JWT issuance)"]
         Extract["/extract/*\n(JWT-protected)"]
-        FileToText["file_to_text()\nPDF · image (OCR) · DOCX · TXT"]
+        FileToText["file_to_text()\nPDF · image (Gemini vision) · DOCX · TXT"]
     end
 
     Gemini[("Google Gemini\n2.5 Flash")]
@@ -60,8 +60,6 @@ flowchart LR
     Extract -- "persist" --> DB
     Extract -- "3. extracted_data" --> Client
 ```
-
-> **OCR note:** image extraction (`.jpg`/`.png`) depends on the Tesseract OCR binary being present on the host. It's not installed on the current Render deployment (Render's native Python runtime doesn't include it), so image uploads there will return a `503` until the service is switched to a Docker-based deploy with Tesseract installed. PDF, DOCX, and TXT are unaffected — they're pure-Python.
 
 ## Setup
 
@@ -134,7 +132,7 @@ Authorization: Bearer <jwt>
 ### `POST /auth/token`
 Exchange `client_id` / `client_secret` for a JWT (30-day expiry). See [Authentication](#authentication) above.
 
-All `/extract/*` endpoints below accept **PDF, JPG, PNG, DOCX, or TXT** — the file extension determines how text is pulled out (PyMuPDF/pdfplumber for PDF, Tesseract OCR for images, python-docx for Word, plain decode for text) before it's handed to Gemini.
+All `/extract/*` endpoints below accept **PDF, JPG, PNG, DOCX, or TXT** — the file extension determines how text is pulled out (PyMuPDF/pdfplumber for PDF, Gemini vision for images, python-docx for Word, plain decode for text) before it's handed to Gemini for extraction.
 
 ### `POST /extract/raw-text`
 Extract raw text from a document — no LLM involved.
@@ -290,7 +288,6 @@ Basic liveness check — `{ "api": "ok", "db": "ok", "llm": "ok" }`.
 | Missing/invalid bearer token | `401` |
 | No file, empty file, unsupported extension, or empty `fields` on `/extract/custom` | `400` |
 | File fails to parse (corrupt/malformed) or has no extractable text | `422` |
-| OCR engine (Tesseract) not available on the host | `503` |
 | Extraction record not found (`/history/{id}`) | `404` |
 | Gemini request times out | `504` |
 | Gemini API error, blocked response, or malformed JSON output | `502` |
@@ -301,7 +298,7 @@ Basic liveness check — `{ "api": "ok", "db": "ok", "llm": "ok" }`.
 |---|---|
 | API framework | FastAPI + Uvicorn |
 | PDF parsing | PyMuPDF (primary), pdfplumber (fallback) |
-| Image OCR | Tesseract via `pytesseract` |
+| Image text extraction | Gemini 2.5 Flash vision (multimodal) |
 | Word doc parsing | `python-docx` |
 | LLM extraction | Google Gemini 2.5 Flash |
 | Database | PostgreSQL via SQLAlchemy |
