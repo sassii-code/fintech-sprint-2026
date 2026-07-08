@@ -9,3 +9,6 @@ google-generativeai
 python-jose[cryptography]
 passlib[bcrypt]
 python-multipart
+pytesseract
+python-docx
+Pillow

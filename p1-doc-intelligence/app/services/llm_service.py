@@ -40,8 +40,7 @@ amounts_mentioned (list), summary (2 sentences).
 Return ONLY valid JSON, no markdown, no backticks."""
 }
 
-def extract_structured_data(raw_text: str, doc_type: str = "general") -> dict:
-    prompt = PROMPTS.get(doc_type, PROMPTS["general"])
+def _run_extraction(prompt: str, raw_text: str) -> dict:
     full_prompt = f"{prompt}\n\nDocument text:\n{raw_text[:6000]}"
 
     try:
@@ -71,3 +70,16 @@ def extract_structured_data(raw_text: str, doc_type: str = "general") -> dict:
         return json.loads(result)
     except json.JSONDecodeError:
         raise HTTPException(status_code=502, detail="LLM returned invalid JSON")
+
+def extract_structured_data(raw_text: str, doc_type: str = "general") -> dict:
+    prompt = PROMPTS.get(doc_type, PROMPTS["general"])
+    return _run_extraction(prompt, raw_text)
+
+def extract_custom_fields(raw_text: str, fields: list[str]) -> dict:
+    field_list = ", ".join(fields)
+    prompt = (
+        f"Extract the following fields from this document: {field_list}. "
+        "Return ONLY a valid JSON object with exactly these fields as keys "
+        "(use null for any field you cannot find). No markdown, no backticks."
+    )
+    return _run_extraction(prompt, raw_text)

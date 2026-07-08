@@ -1,50 +1,21 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends
 from sqlalchemy.orm import Session
-import pymupdf
-import pdfplumber
-import io
 import json
-from app.services.llm_service import extract_structured_data
+from app.services.llm_service import extract_structured_data, extract_custom_fields
+from app.services.document_service import file_to_text
 from app.models.database import get_db, Extraction
 from app.services.auth_service import verify_token
 router = APIRouter(prefix="/extract", tags=["extraction"], dependencies=[Depends(verify_token)])
 
-# ── shared helper ──
-async def pdf_to_text(file: UploadFile) -> str:
-    if not file.filename or not file.filename.lower().endswith(".pdf"):
-        raise HTTPException(status_code=400, detail="Only PDF files accepted")
-
-    contents = await file.read()
-    if not contents:
-        raise HTTPException(status_code=400, detail="Uploaded file is empty")
-
-    text = ""
-    try:
-        doc = pymupdf.open(stream=contents, filetype="pdf")
-        for page in doc:
-            text += page.get_text()
-        doc.close()
-    except Exception:
-        try:
-            with pdfplumber.open(io.BytesIO(contents)) as pdf:
-                for page in pdf.pages:
-                    text += page.extract_text() or ""
-        except Exception:
-            raise HTTPException(status_code=422, detail="Could not read PDF — file may be corrupted or malformed")
-
-    if not text.strip():
-        raise HTTPException(status_code=422, detail="Could not extract text from PDF")
-    return text
-
 # ── endpoints ──
 @router.post("/raw-text")
 async def extract_raw_text(file: UploadFile = File(...)):
-    text = await pdf_to_text(file)
+    text = await file_to_text(file)
     return {"filename": file.filename, "char_count": len(text), "preview": text[:2000]}
 
 @router.post("/resume")
 async def extract_resume(file: UploadFile = File(...), db: Session = Depends(get_db)):
-    text = await pdf_to_text(file)
+    text = await file_to_text(file)
     data = extract_structured_data(text, "resume")
     record = Extraction(filename=file.filename, doc_type="resume", extracted_data=json.dumps(data))
     db.add(record)
@@ -54,7 +25,7 @@ async def extract_resume(file: UploadFile = File(...), db: Session = Depends(get
 
 @router.post("/bank-statement")
 async def extract_bank_statement(file: UploadFile = File(...), db: Session = Depends(get_db)):
-    text = await pdf_to_text(file)
+    text = await file_to_text(file)
     data = extract_structured_data(text, "bank_statement")
     record = Extraction(filename=file.filename, doc_type="bank_statement", extracted_data=json.dumps(data))
     db.add(record)
@@ -64,7 +35,7 @@ async def extract_bank_statement(file: UploadFile = File(...), db: Session = Dep
 
 @router.post("/invoice")
 async def extract_invoice(file: UploadFile = File(...), db: Session = Depends(get_db)):
-    text = await pdf_to_text(file)
+    text = await file_to_text(file)
     data = extract_structured_data(text, "invoice")
     record = Extraction(filename=file.filename, doc_type="invoice", extracted_data=json.dumps(data))
     db.add(record)
@@ -72,12 +43,29 @@ async def extract_invoice(file: UploadFile = File(...), db: Session = Depends(ge
     db.refresh(record)
     return {"id": record.id, "filename": file.filename, "doc_type": "invoice", "extracted_data": data}
 
+@router.post("/custom")
+async def extract_custom(
+    file: UploadFile = File(...),
+    fields: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    field_list = [f.strip() for f in fields.split(",") if f.strip()]
+    if not field_list:
+        raise HTTPException(status_code=400, detail="At least one field must be specified")
+    text = await file_to_text(file)
+    data = extract_custom_fields(text, field_list)
+    record = Extraction(filename=file.filename, doc_type="custom", extracted_data=json.dumps(data))
+    db.add(record)
+    db.commit()
+    db.refresh(record)
+    return {"id": record.id, "filename": file.filename, "doc_type": "custom", "extracted_data": data}
+
 @router.post("/auto")
 async def extract_auto(
     file: UploadFile = File(...),
     db: Session = Depends(get_db)
 ):
-    text = await pdf_to_text(file)
+    text = await file_to_text(file)
     text_lower = text.lower()
     if any(w in text_lower for w in ["experience", "education", "skills", "resume", "cv"]):
         doc_type = "resume"
