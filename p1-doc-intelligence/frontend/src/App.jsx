@@ -2,7 +2,10 @@ import { useCallback, useEffect, useState } from "react";
 import { API_BASE_URL, extractDocument, getExtraction, getHistory } from "./api";
 import LoginBar from "./components/LoginBar";
 import Dropzone from "./components/Dropzone";
+import BatchDropzone from "./components/BatchDropzone";
+import BatchResults from "./components/BatchResults";
 import DocTypeSelector from "./components/DocTypeSelector";
+import CustomFieldsInput from "./components/CustomFieldsInput";
 import ResultsView from "./components/ResultsView";
 import HistoryPanel from "./components/HistoryPanel";
 
@@ -11,13 +14,21 @@ const TOKEN_KEY = "doc_intel_token";
 function App() {
   const [token, setToken] = useState(() => localStorage.getItem(TOKEN_KEY));
 
+  const [mode, setMode] = useState("single"); // "single" | "batch"
+  const [docType, setDocType] = useState("auto");
+  const [customFields, setCustomFields] = useState("");
+
+  // single-file flow
   const [file, setFile] = useState(null);
   const [fileError, setFileError] = useState(null);
-  const [docType, setDocType] = useState("auto");
-
   const [result, setResult] = useState(null);
   const [resultError, setResultError] = useState(null);
   const [extracting, setExtracting] = useState(false);
+
+  // batch flow
+  const [batchFiles, setBatchFiles] = useState([]);
+  const [batchItems, setBatchItems] = useState([]);
+  const [batchRunning, setBatchRunning] = useState(false);
 
   const [history, setHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -71,14 +82,18 @@ function App() {
     setResultError(null);
   }
 
+  function requiresFields() {
+    return docType === "custom" && customFields.trim().length === 0;
+  }
+
   async function handleExtract() {
-    if (!file || !token) return;
+    if (!file || !token || requiresFields()) return;
     setExtracting(true);
     setResultError(null);
     setResult(null);
     setSelectedId(null);
     try {
-      const data = await extractDocument(docType, file, token);
+      const data = await extractDocument(docType, file, token, customFields);
       setResult(data);
       setSelectedId(data.id ?? null);
       loadHistory();
@@ -105,6 +120,38 @@ function App() {
     } finally {
       setExtracting(false);
     }
+  }
+
+  function handleBatchFilesAdded(newFiles) {
+    setBatchFiles((prev) => [...prev, ...newFiles]);
+  }
+
+  function handleBatchRemove(index) {
+    setBatchFiles((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  async function handleBatchExtract() {
+    if (batchFiles.length === 0 || !token || requiresFields()) return;
+    setBatchRunning(true);
+    const items = batchFiles.map((f) => ({ file: f, status: "queued", data: null, error: null }));
+    setBatchItems(items);
+
+    for (let i = 0; i < items.length; i++) {
+      setBatchItems((prev) => prev.map((it, idx) => (idx === i ? { ...it, status: "processing" } : it)));
+      try {
+        const data = await extractDocument(docType, items[i].file, token, customFields);
+        setBatchItems((prev) => prev.map((it, idx) => (idx === i ? { ...it, status: "done", data } : it)));
+      } catch (err) {
+        if (err.status === 401) {
+          handleLogout();
+          return;
+        }
+        setBatchItems((prev) => prev.map((it, idx) => (idx === i ? { ...it, status: "error", error: err.message } : it)));
+      }
+    }
+
+    setBatchRunning(false);
+    loadHistory();
   }
 
   if (!token) {
@@ -139,20 +186,69 @@ function App() {
       <div className="layout-grid">
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <div className="card" style={{ padding: 20, display: "flex", flexDirection: "column", gap: 16 }}>
-            <DocTypeSelector value={docType} onChange={setDocType} />
-            <Dropzone file={file} onFileSelected={handleFileSelected} />
-            {fileError && <div style={{ color: "var(--danger)", fontSize: "0.85rem" }}>{fileError}</div>}
-            <button
-              className="btn btn-primary"
-              disabled={!file || extracting}
-              onClick={handleExtract}
-              style={{ alignSelf: "flex-start" }}
-            >
-              {extracting ? "Extracting…" : "Extract document"}
-            </button>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+              <DocTypeSelector value={docType} onChange={setDocType} />
+              <div style={{ display: "flex", gap: 6 }}>
+                {["single", "batch"].map((m) => (
+                  <button
+                    key={m}
+                    className="btn"
+                    onClick={() => setMode(m)}
+                    style={{
+                      padding: "6px 14px",
+                      fontSize: "0.78rem",
+                      background: mode === m ? "var(--accent-grad)" : "transparent",
+                      color: mode === m ? "#0f172a" : "var(--text-muted)",
+                      border: mode === m ? "none" : "1px solid var(--border)",
+                    }}
+                  >
+                    {m === "single" ? "Single" : "Batch"}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {docType === "custom" && <CustomFieldsInput value={customFields} onChange={setCustomFields} />}
+
+            {mode === "single" ? (
+              <>
+                <Dropzone file={file} onFileSelected={handleFileSelected} />
+                {fileError && <div style={{ color: "var(--danger)", fontSize: "0.85rem" }}>{fileError}</div>}
+                <button
+                  className="btn btn-primary"
+                  disabled={!file || extracting || requiresFields()}
+                  onClick={handleExtract}
+                  style={{ alignSelf: "flex-start" }}
+                >
+                  {extracting ? "Extracting…" : "Extract document"}
+                </button>
+              </>
+            ) : (
+              <>
+                <BatchDropzone
+                  files={batchFiles}
+                  onFilesAdded={handleBatchFilesAdded}
+                  onRemove={handleBatchRemove}
+                  onClear={() => setBatchFiles([])}
+                  disabled={batchRunning}
+                />
+                <button
+                  className="btn btn-primary"
+                  disabled={batchFiles.length === 0 || batchRunning || requiresFields()}
+                  onClick={handleBatchExtract}
+                  style={{ alignSelf: "flex-start" }}
+                >
+                  {batchRunning ? "Extracting…" : `Extract ${batchFiles.length || ""} document(s)`}
+                </button>
+              </>
+            )}
           </div>
 
-          <ResultsView loading={extracting} error={resultError} result={result} />
+          {mode === "single" ? (
+            <ResultsView loading={extracting} error={resultError} result={result} />
+          ) : (
+            <BatchResults items={batchItems} running={batchRunning} />
+          )}
         </div>
 
         <HistoryPanel

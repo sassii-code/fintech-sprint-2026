@@ -1,4 +1,18 @@
 import { useRef, useState } from "react";
+import { ACCEPT_ATTR, ACCEPTED_EXTENSIONS } from "../api";
+
+function extensionOf(name) {
+  const i = name.lastIndexOf(".");
+  return i === -1 ? "" : name.slice(i).toLowerCase();
+}
+
+function iconFor(name) {
+  const ext = extensionOf(name);
+  if ([".jpg", ".jpeg", ".png"].includes(ext)) return "🖼️";
+  if (ext === ".docx") return "📝";
+  if (ext === ".txt") return "📃";
+  return "📄";
+}
 
 export default function Dropzone({ file, onFileSelected }) {
   const inputRef = useRef(null);
@@ -7,8 +21,8 @@ export default function Dropzone({ file, onFileSelected }) {
   function pick(files) {
     const picked = files?.[0];
     if (!picked) return;
-    if (!picked.name.toLowerCase().endsWith(".pdf")) {
-      onFileSelected(null, "Only PDF files are accepted");
+    if (!ACCEPTED_EXTENSIONS.includes(extensionOf(picked.name))) {
+      onFileSelected(null, `Unsupported file type. Accepted: ${ACCEPTED_EXTENSIONS.join(", ")}`);
       return;
     }
     onFileSelected(picked, null);
@@ -41,13 +55,13 @@ export default function Dropzone({ file, onFileSelected }) {
       <input
         ref={inputRef}
         type="file"
-        accept="application/pdf"
+        accept={ACCEPT_ATTR}
         hidden
         onChange={(e) => pick(e.target.files)}
       />
       {file ? (
         <>
-          <div style={{ fontSize: "1.6rem", marginBottom: 8 }}>📄</div>
+          <div style={{ fontSize: "1.6rem", marginBottom: 8 }}>{iconFor(file.name)}</div>
           <div style={{ fontWeight: 600 }}>{file.name}</div>
           <div style={{ color: "var(--text-faint)", fontSize: "0.8rem", marginTop: 4 }}>
             {(file.size / 1024).toFixed(1)} KB — click or drop to replace
@@ -56,9 +70,9 @@ export default function Dropzone({ file, onFileSelected }) {
       ) : (
         <>
           <div style={{ fontSize: "1.8rem", marginBottom: 8 }}>⬆️</div>
-          <div style={{ fontWeight: 600 }}>Drag & drop a PDF here</div>
+          <div style={{ fontWeight: 600 }}>Drag & drop a file here</div>
           <div style={{ color: "var(--text-faint)", fontSize: "0.8rem", marginTop: 4 }}>
-            or click to browse
+            or click to browse — PDF, JPG, PNG, DOCX, TXT
           </div>
         </>
       )}
