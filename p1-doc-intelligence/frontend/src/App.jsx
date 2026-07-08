@@ -245,9 +245,9 @@ function App() {
           </div>
 
           {mode === "single" ? (
-            <ResultsView loading={extracting} error={resultError} result={result} />
+            <ResultsView loading={extracting} error={resultError} result={result} token={token} />
           ) : (
-            <BatchResults items={batchItems} running={batchRunning} />
+            <BatchResults items={batchItems} running={batchRunning} token={token} />
           )}
         </div>
 

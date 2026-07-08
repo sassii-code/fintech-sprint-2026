@@ -122,4 +122,34 @@ export function getExtraction(id, token) {
   return request(`/extract/history/${id}`, { token });
 }
 
+// Returns a Blob (an .xlsx file), not JSON — can't go through request().
+export async function exportToExcel(records, token) {
+  const headers = new Headers({ "Content-Type": "application/json" });
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+
+  let res;
+  try {
+    res = await fetch(`${API_BASE_URL}/extract/export`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ records }),
+    });
+  } catch {
+    throw new ApiError(`Could not reach the API at ${API_BASE_URL}`, 0);
+  }
+
+  if (!res.ok) {
+    let detail = res.statusText;
+    try {
+      const body = await res.json();
+      detail = body.detail || detail;
+    } catch {
+      // response wasn't JSON, keep statusText
+    }
+    throw new ApiError(typeof detail === "string" ? detail : JSON.stringify(detail), res.status);
+  }
+
+  return res.blob();
+}
+
 export { API_BASE_URL };

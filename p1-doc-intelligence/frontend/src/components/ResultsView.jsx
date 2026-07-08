@@ -1,8 +1,11 @@
 import { useState } from "react";
-import { flattenObject, toCSV, downloadCSV } from "../csv";
+import { flattenObject, toCSV, downloadCSV, downloadBlob } from "../csv";
+import { exportToExcel } from "../api";
 
-export default function ResultsView({ loading, error, result }) {
+export default function ResultsView({ loading, error, result, token }) {
   const [copied, setCopied] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState(null);
 
   if (loading) {
     return (
@@ -37,6 +40,7 @@ export default function ResultsView({ loading, error, result }) {
   }
 
   const payload = result.extracted_data ?? result.preview ?? result;
+  const dataObject = typeof payload === "object" && payload !== null ? payload : { value: payload };
 
   function handleCopy() {
     navigator.clipboard.writeText(JSON.stringify(payload, null, 2)).then(() => {
@@ -46,8 +50,24 @@ export default function ResultsView({ loading, error, result }) {
   }
 
   function handleDownloadCSV() {
-    const flat = flattenObject(typeof payload === "object" ? payload : { value: payload });
+    const flat = flattenObject(dataObject);
     downloadCSV(`${result.filename || "extraction"}.csv`, toCSV([flat]));
+  }
+
+  async function handleDownloadExcel() {
+    setExporting(true);
+    setExportError(null);
+    try {
+      const blob = await exportToExcel(
+        [{ filename: result.filename || "extraction", doc_type: result.doc_type ?? null, extracted_data: dataObject }],
+        token
+      );
+      downloadBlob(`${result.filename || "extraction"}.xlsx`, blob);
+    } catch (err) {
+      setExportError(err.message);
+    } finally {
+      setExporting(false);
+    }
   }
 
   return (
@@ -88,8 +108,23 @@ export default function ResultsView({ loading, error, result }) {
           <button className="btn btn-ghost" style={{ padding: "6px 12px", fontSize: "0.78rem" }} onClick={handleDownloadCSV}>
             Download CSV
           </button>
+          <button
+            className="btn btn-ghost"
+            style={{ padding: "6px 12px", fontSize: "0.78rem" }}
+            onClick={handleDownloadExcel}
+            disabled={exporting}
+          >
+            {exporting ? "Exporting…" : "Download Excel"}
+          </button>
         </div>
       </div>
+
+      {exportError && (
+        <div style={{ color: "var(--danger)", fontSize: "0.8rem", marginBottom: 12 }}>
+          Excel export failed: {exportError}
+        </div>
+      )}
+
       <pre
         style={{
           margin: 0,
