@@ -1,0 +1,74 @@
+import io
+import pandas as pd
+from fastapi import HTTPException, UploadFile
+
+REQUIRED_COLUMNS = {"date", "description", "amount", "type"}
+VALID_TYPES = {"income", "expense"}
+
+
+def _read_dataframe(filename: str, contents: bytes) -> pd.DataFrame:
+    ext = filename.lower().rsplit(".", 1)[-1] if "." in filename else ""
+    try:
+        if ext == "csv":
+            return pd.read_csv(io.BytesIO(contents))
+        if ext in ("xlsx", "xls"):
+            return pd.read_excel(io.BytesIO(contents))
+    except Exception:
+        raise HTTPException(status_code=422, detail="Could not read file — it may be corrupted or malformed")
+
+    raise HTTPException(status_code=400, detail=f"Unsupported file type '.{ext}'. Supported: .csv, .xlsx, .xls")
+
+
+async def parse_transaction_file(file: UploadFile) -> list[dict]:
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="No filename provided")
+
+    contents = await file.read()
+    if not contents:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty")
+
+    df = _read_dataframe(file.filename, contents)
+    df.columns = [str(c).strip().lower() for c in df.columns]
+
+    missing = REQUIRED_COLUMNS - set(df.columns)
+    if missing:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Missing required column(s): {', '.join(sorted(missing))}. Expected: date, description, amount, type"
+        )
+
+    df = df.dropna(how="all")
+    if df.empty:
+        raise HTTPException(status_code=422, detail="File contains no transaction rows")
+
+    rows = []
+    for i, row in df.iterrows():
+        try:
+            date_value = pd.to_datetime(row["date"]).date().isoformat()
+        except Exception:
+            raise HTTPException(status_code=422, detail=f"Row {i + 2}: invalid date '{row['date']}'")
+
+        try:
+            amount_value = float(row["amount"])
+        except Exception:
+            raise HTTPException(status_code=422, detail=f"Row {i + 2}: invalid amount '{row['amount']}'")
+
+        type_value = str(row["type"]).strip().lower()
+        if type_value not in VALID_TYPES:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Row {i + 2}: invalid type '{row['type']}' — must be 'income' or 'expense'"
+            )
+
+        description_value = str(row["description"]).strip()
+        if not description_value or description_value.lower() == "nan":
+            raise HTTPException(status_code=422, detail=f"Row {i + 2}: description is empty")
+
+        rows.append({
+            "date": date_value,
+            "description": description_value,
+            "amount": amount_value,
+            "type": type_value,
+        })
+
+    return rows

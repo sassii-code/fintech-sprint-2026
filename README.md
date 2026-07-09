@@ -18,6 +18,14 @@ REST API for expense tracking with ML categorization.
 ### 🟢 P3 — AI Financial Assistant (Week 7)
 RAG-powered chatbot for financial document Q&A.
 
+### 🟣 P4 — AI Financial Assistant API
+Upload transaction CSV/Excel files, auto-categorize with Gemini, and get spending analytics + AI-generated financial insights.
+- Stack: FastAPI · Gemini · PostgreSQL · pandas · JWT
+- Endpoints: /transactions/upload · /analytics/spending-by-category ·
+  /analytics/monthly-trends · /analytics/income-vs-expenses ·
+  /analytics/top-merchants · /analytics/anomalies · /analytics/insights
+- See [`p4-financial-assistant/README.md`](p4-financial-assistant/README.md)
+
 ## Stack
 Python · FastAPI · PostgreSQL · Redis · Docker · 
 Groq LLM · PyMuPDF · SQLAlchemy · JWT
