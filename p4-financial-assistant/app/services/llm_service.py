@@ -90,3 +90,41 @@ def generate_insights(summary: dict) -> str:
         f"Summary:\n{json.dumps(summary, indent=2, default=str)}"
     )
     return _generate(prompt)
+
+def answer_question(question: str, data: dict) -> dict:
+    """Returns {"answerable": bool, "answer": str}. The model is asked to say so
+    explicitly when the provided data can't support a confident answer, rather
+    than free-text refusals we'd have to guess at parsing."""
+    prompt = (
+        "You are a personal finance assistant answering a user's question about their own transaction data. "
+        "Answer using ONLY the JSON data provided below — never invent numbers, transactions, or trends that "
+        "aren't present in it. If the data doesn't contain enough information to answer confidently, set "
+        '"answerable" to false and explain what\'s missing instead of guessing.\n\n'
+        'Return ONLY a valid JSON object shaped like {"answerable": true | false, "answer": "..."}. '
+        "The answer should be plain conversational English, 1-4 sentences, no markdown, no backticks.\n\n"
+        f"User's question: {question}\n\n"
+        f"Transaction data:\n{json.dumps(data, indent=2, default=str)}"
+    )
+
+    result = _strip_markdown_json(_generate(prompt))
+    try:
+        parsed = json.loads(result)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=502, detail="LLM returned invalid JSON while answering the question")
+
+    if not isinstance(parsed, dict) or "answer" not in parsed:
+        raise HTTPException(status_code=502, detail="LLM returned an unexpected response shape")
+
+    return {"answerable": bool(parsed.get("answerable", True)), "answer": str(parsed["answer"])}
+
+def explain_health_score(score: int, breakdown: dict) -> str:
+    prompt = (
+        "You are a personal finance assistant. A user's financial health score (0-100) was just computed from "
+        "these four weighted components: savings rate, spending consistency, expense-to-income ratio, and "
+        "emergency fund buffer (in months of expenses covered). Write a 2-3 sentence explanation of what's "
+        "mainly driving their score, plus exactly one specific, actionable suggestion to improve it. "
+        "Reference the actual numbers. No markdown, no bullet points, no headers — plain prose only.\n\n"
+        f"Score: {score}/100\n"
+        f"Breakdown:\n{json.dumps(breakdown, indent=2, default=str)}"
+    )
+    return _generate(prompt)

@@ -54,7 +54,12 @@ async def parse_transaction_file(file: UploadFile) -> list[dict]:
             raise HTTPException(status_code=422, detail=f"Row {i + 2}: invalid date '{row['date']}'")
 
         try:
-            amount_value = float(row["amount"])
+            # `type` is the sole source of direction throughout this system —
+            # normalize to a positive magnitude here so a source file that
+            # signs its amounts (negative for expenses) doesn't corrupt every
+            # downstream sum-by-type (savings rate, expense ratio, etc. all
+            # assume magnitude, not signed values).
+            amount_value = abs(float(row["amount"]))
         except Exception:
             raise HTTPException(status_code=422, detail=f"Row {i + 2}: invalid amount '{row['amount']}'")
 

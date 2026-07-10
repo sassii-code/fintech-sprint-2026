@@ -45,6 +45,25 @@ class Transaction(Base):
 
     account = relationship("Account", back_populates="transactions")
 
+class RecurringTransaction(Base):
+    """A detected recurring pattern (subscription, rent, paycheck, etc.), persisted
+    so callers can read it without re-running fuzzy-matching detection every time.
+    Refreshed (replaced) whenever GET /transactions/recurring is called."""
+    __tablename__ = "recurring_transactions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    account_id = Column(Integer, ForeignKey("accounts.id"), nullable=False, index=True)
+    merchant = Column(String, nullable=False)
+    amount = Column(Float, nullable=False)  # average amount across occurrences
+    type = Column(String, nullable=False)  # "income" | "expense"
+    frequency = Column(String, nullable=False)  # "weekly" | "monthly" | "yearly"
+    occurrence_count = Column(Integer, nullable=False)
+    last_seen_date = Column(Date, nullable=False)
+    next_expected_date = Column(Date, nullable=False)
+    total_spent_lifetime = Column(Float, nullable=False)
+    transaction_ids = Column(String, nullable=False)  # comma-separated Transaction ids in this cluster
+    detected_at = Column(DateTime, default=datetime.utcnow)
+
 def get_db():
     db = SessionLocal()
     try:

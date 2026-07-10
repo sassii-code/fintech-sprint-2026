@@ -28,10 +28,14 @@ def startup_event():
 from app.routers import auth
 from app.routers import transactions
 from app.routers import analytics
+from app.routers import insights
+from app.routers import export
 
 app.include_router(auth.router)
 app.include_router(transactions.router)
 app.include_router(analytics.router)
+app.include_router(insights.router)
+app.include_router(export.router)
 
 ROOT_PAGE = """<!doctype html>
 <html lang="en">
@@ -105,7 +109,11 @@ ROOT_PAGE = """<!doctype html>
     <li>📤 Upload CSV/Excel transactions, auto-categorized into 9 spending categories</li>
     <li>📊 Analytics: spending by category, monthly trends, income vs expenses, top merchants</li>
     <li>🤖 AI-generated natural-language financial insights via Gemini</li>
+    <li>💬 Ask questions about your own transactions in plain English via <code>/insights/query</code></li>
+    <li>🔁 Recurring transaction / subscription detection</li>
+    <li>❤️ AI-explained financial health score via <code>/insights/health-score</code></li>
     <li>🚨 Anomaly detection for unusually large transactions</li>
+    <li>📑 QuickBooks / Xero accounting export</li>
     <li>🔐 JWT-protected API with token issuance via <code>/auth/token</code></li>
   </ul>
   <a class="docs-link" href="/docs">Explore the API docs →</a>

@@ -8,6 +8,7 @@ Upload bank transactions (CSV/Excel), auto-categorize them with Gemini, and get 
 - **PostgreSQL + SQLAlchemy** — accounts + transactions storage
 - **Google Gemini** (`gemini-2.5-flash`) — transaction categorization + natural-language insights
 - **pandas** — file parsing (CSV/Excel) and analytics aggregation
+- **rapidfuzz** — fuzzy merchant/description matching for recurring-transaction detection
 - **JWT** (`python-jose`) + `passlib` — auth (same pattern as `p1-doc-intelligence`)
 
 ## Setup
@@ -64,6 +65,13 @@ List transactions, most recent first. Query params: `account_id`, `category`, `l
 ### `GET /transactions/{id}`
 Single transaction. `404` if not found or not owned by the caller.
 
+### `GET /transactions/recurring`
+Detects recurring transactions (subscriptions, rent, paycheck, etc.). Groups transactions by the Gemini-assigned `merchant` (exact match — this is why upload categorization matters here) with a fuzzy-match fallback on raw `description` (rapidfuzz `token_set_ratio` ≥ 80) for rows with no merchant, and amounts within 5% of the cluster's running average. A cluster of 2+ occurrences is "recurring" if the intervals between them are consistently weekly (~7d), monthly (~30d), or yearly (~365d) — see `FREQUENCY_BUCKETS` in `recurring_service.py` for exact tolerances.
+
+Recomputed fresh on every call (so new uploads are picked up immediately) and the results replace this client's rows in the `recurring_transactions` table, so other code can read detected patterns without re-running detection itself.
+
+Response: array of `{ account_id, merchant, amount, type, frequency, occurrence_count, last_seen_date, next_expected_date, total_spent_lifetime, transaction_ids }`.
+
 ### `GET /analytics/spending-by-category`
 Total + count of expenses grouped by category, sorted descending.
 
@@ -84,23 +92,46 @@ Builds a summary (spending by category, monthly trends, income vs expenses, top 
 
 Response: `{ insights: "...", summary: {...} }` — both the generated advice and the raw summary it was based on.
 
+### `POST /insights/query`
+Ask a natural-language question about your own transactions (e.g. *"How much did I spend on food last month?"*). The full analytics summary plus your 150 most recent transactions are sent to Gemini with instructions to answer using **only** that data and to say so explicitly — not guess — if it can't answer confidently. If you have zero transactions, this short-circuits with a clear message and skips the Gemini call entirely.
+
+- Body: `{ "question": "..." }`. `400` if empty/whitespace-only.
+- Response: `{ question, answer, data_used }` — `data_used` is the exact summary + recent transactions the answer was grounded in, for transparency.
+
+### `GET /insights/health-score`
+Financial health score (0-100) from four weighted components — savings rate (35%), month-to-month spending consistency (25%), expense-to-income ratio (25%), and an emergency-fund buffer proxy (15%, since we don't have real bank balances: derived from the average of the running cumulative net (income − expenses) over your transaction history, expressed in months of average expense coverage). `404` if you have no transaction data.
+
+Response: `{ score, breakdown: { savings_rate, consistency, expense_ratio, buffer }, explanation }` — each breakdown entry is `{ value, score }` (raw metric + 0-100 component score); `explanation` is Gemini-generated, citing the actual numbers plus one actionable suggestion.
+
 ### `GET /health`
 Basic liveness check.
+
+### `GET /export/accounting`
+Export categorized transactions as a CSV formatted for import into QuickBooks or Xero. Categories are mapped from the Gemini-assigned categories to standard accounting names/codes (see `ACCOUNTING_CATEGORY_MAP` in `export_service.py`, e.g. `Food` → "Meals & Entertainment", `Subscriptions` → "Software & Subscriptions"). Amounts follow accounting-CSV sign convention: expenses negative, income positive.
+
+- Query params: `format` (`quickbooks` or `xero`, required), `date_from`/`date_to` (optional, inclusive `YYYY-MM-DD`)
+- QuickBooks columns: `Date, Description, Amount, Category`
+- Xero columns: `Date, Amount, Payee, Description, Reference, Account Code`
+- `400` for an unsupported format or `date_from` after `date_to`; `404` if no transactions match the filters
+- Returns the CSV as a file download (`Content-Disposition: attachment`)
 
 ## Error Handling
 
 | Situation | Status |
 |---|---|
 | Missing/invalid bearer token | `401` |
-| No file, empty file, unsupported extension (not .csv/.xlsx/.xls), or missing required column | `400` |
+| No file, empty file, unsupported extension (not .csv/.xlsx/.xls), missing required column, empty `question`, unsupported export `format`, or `date_from` after `date_to` | `400` |
 | Unparseable file, invalid date/amount/type in a row | `422` |
-| Transaction not found / not owned by caller | `404` |
+| Transaction not found / not owned by caller; no transaction data for a health score; no transactions matching export filters | `404` |
 | Gemini request times out | `504` |
-| Gemini API error (including rate limits) or malformed categorization output | `502` |
+| Gemini API error (including rate limits) or malformed LLM output (categorization, query answer) | `502` |
 
 ## Data model
 
 - **Account** — `id`, `client_id` (owner, from JWT), `name`, `created_at`
 - **Transaction** — `id`, `account_id`, `date`, `description`, `amount`, `type`, `category`, `merchant`, `created_at`
+- **RecurringTransaction** — `id`, `account_id`, `merchant`, `amount` (average), `type`, `frequency`, `occurrence_count`, `last_seen_date`, `next_expected_date`, `total_spent_lifetime`, `transaction_ids`, `detected_at` — replaced wholesale on each `GET /transactions/recurring` call
+
+> **Known data-quality caveat:** `amount` is normalized to a positive magnitude at upload time (`type` is the sole source of direction) as of this table's most recent fix. Rows uploaded *before* that fix may still have signed amounts on `expense` rows, which will skew `/insights/health-score`, `/analytics/*`, and `/export/accounting` for that data until re-uploaded or manually corrected.
 
 All queries are scoped to the authenticated `client_id` via a join through `Account`, so one client can never see another's data.
