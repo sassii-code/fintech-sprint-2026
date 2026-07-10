@@ -3,7 +3,12 @@ import pandas as pd
 from fastapi import HTTPException, UploadFile
 
 REQUIRED_COLUMNS = {"date", "description", "amount", "type"}
-VALID_TYPES = {"income", "expense"}
+TYPE_ALIASES = {
+    "income": "income",
+    "expense": "expense",
+    "credit": "income",
+    "debit": "expense",
+}
 
 
 def _read_dataframe(filename: str, contents: bytes) -> pd.DataFrame:
@@ -53,11 +58,12 @@ async def parse_transaction_file(file: UploadFile) -> list[dict]:
         except Exception:
             raise HTTPException(status_code=422, detail=f"Row {i + 2}: invalid amount '{row['amount']}'")
 
-        type_value = str(row["type"]).strip().lower()
-        if type_value not in VALID_TYPES:
+        raw_type = str(row["type"]).strip().lower()
+        type_value = TYPE_ALIASES.get(raw_type)
+        if type_value is None:
             raise HTTPException(
                 status_code=422,
-                detail=f"Row {i + 2}: invalid type '{row['type']}' — must be 'income' or 'expense'"
+                detail=f"Row {i + 2}: invalid type '{row['type']}' — must be one of 'income', 'expense', 'credit', 'debit'"
             )
 
         description_value = str(row["description"]).strip()
