@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, Column, Integer, String, Float, Date, DateTime, ForeignKey
+from sqlalchemy import create_engine, Column, Integer, String, Float, Date, DateTime, ForeignKey, JSON
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from datetime import datetime
@@ -63,6 +63,21 @@ class RecurringTransaction(Base):
     total_spent_lifetime = Column(Float, nullable=False)
     transaction_ids = Column(String, nullable=False)  # comma-separated Transaction ids in this cluster
     detected_at = Column(DateTime, default=datetime.utcnow)
+
+class HealthScoreCache(Base):
+    """Caches the AI-generated health-score explanation per client so it's
+    regenerated at most once per day (Gemini's free tier caps at 20
+    requests/day) instead of on every dashboard load. The score/breakdown
+    themselves are cheap and deterministic and are recomputed fresh on every
+    request — only the LLM explanation text is cached here."""
+    __tablename__ = "health_score_cache"
+
+    id = Column(Integer, primary_key=True, index=True)
+    client_id = Column(String, nullable=False, unique=True, index=True)
+    score = Column(Integer, nullable=False)
+    breakdown = Column(JSON, nullable=False)
+    explanation = Column(String, nullable=False)
+    computed_at = Column(DateTime, default=datetime.utcnow)
 
 def get_db():
     db = SessionLocal()

@@ -101,7 +101,9 @@ Ask a natural-language question about your own transactions (e.g. *"How much did
 ### `GET /insights/health-score`
 Financial health score (0-100) from four weighted components — savings rate (35%), month-to-month spending consistency (25%), expense-to-income ratio (25%), and an emergency-fund buffer proxy (15%, since we don't have real bank balances: derived from the average of the running cumulative net (income − expenses) over your transaction history, expressed in months of average expense coverage). `404` if you have no transaction data.
 
-Response: `{ score, breakdown: { savings_rate, consistency, expense_ratio, buffer }, explanation }` — each breakdown entry is `{ value, score }` (raw metric + 0-100 component score); `explanation` is Gemini-generated, citing the actual numbers plus one actionable suggestion.
+Response: `{ score, breakdown: { savings_rate, consistency, expense_ratio, buffer }, explanation, explanation_updated_at }` — each breakdown entry is `{ value, score }` (raw metric + 0-100 component score); `explanation` is Gemini-generated, citing the actual numbers plus one actionable suggestion.
+
+`score`/`breakdown` are cheap and recomputed on every call. `explanation` is cached per client in the `health_score_cache` table and only regenerated once every 24 hours (Gemini's free tier caps at 20 requests/day, and dashboard loads would burn through that in minutes otherwise) — `explanation_updated_at` tells you when it was last regenerated. If a refresh is due but the Gemini call fails (e.g. rate limited), the endpoint falls back to serving the last cached explanation rather than erroring, as long as one exists at all.
 
 ### `GET /health`
 Basic liveness check.
@@ -131,6 +133,7 @@ Export categorized transactions as a CSV formatted for import into QuickBooks or
 - **Account** — `id`, `client_id` (owner, from JWT), `name`, `created_at`
 - **Transaction** — `id`, `account_id`, `date`, `description`, `amount`, `type`, `category`, `merchant`, `created_at`
 - **RecurringTransaction** — `id`, `account_id`, `merchant`, `amount` (average), `type`, `frequency`, `occurrence_count`, `last_seen_date`, `next_expected_date`, `total_spent_lifetime`, `transaction_ids`, `detected_at` — replaced wholesale on each `GET /transactions/recurring` call
+- **HealthScoreCache** — `id`, `client_id` (unique), `score`, `breakdown` (JSON), `explanation`, `computed_at` — one row per client, upserted at most once every 24 hours by `GET /insights/health-score`
 
 > **Known data-quality caveat:** `amount` is normalized to a positive magnitude at upload time (`type` is the sole source of direction) as of this table's most recent fix. Rows uploaded *before* that fix may still have signed amounts on `expense` rows, which will skew `/insights/health-score`, `/analytics/*`, and `/export/accounting` for that data until re-uploaded or manually corrected.
 
