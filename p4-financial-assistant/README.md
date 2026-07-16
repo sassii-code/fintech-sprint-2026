@@ -9,7 +9,6 @@ Upload bank transactions (CSV/Excel), auto-categorize them with Gemini, and get 
 - **Google Gemini** (`gemini-2.5-flash`) — transaction categorization + natural-language insights
 - **pandas** — file parsing (CSV/Excel) and analytics aggregation
 - **rapidfuzz** — fuzzy merchant/description matching for recurring-transaction detection
-- **JWT** (`python-jose`) + `passlib` — auth (same pattern as `p1-doc-intelligence`)
 
 ## Setup
 
@@ -26,7 +25,6 @@ Upload bank transactions (CSV/Excel), auto-categorize them with Gemini, and get 
    ```
    GEMINI_API_KEY=your-gemini-api-key
    DATABASE_URL=postgresql://user:password@localhost:5432/your_db
-   SECRET_KEY=a-long-random-secret-for-signing-jwts
    ```
    The database must already exist. `postgres://` URLs (e.g. from Render) are normalized to `postgresql://` automatically.
 
@@ -34,19 +32,11 @@ Upload bank transactions (CSV/Excel), auto-categorize them with Gemini, and get 
    ```bash
    uvicorn app.main:app --reload
    ```
-   Tables are created automatically on startup. Swagger UI at `http://localhost:8000/docs`.
+   Tables are created automatically on startup, and a shared `demo` account is seeded with ~6 months of realistic transactions on first startup (see `app/seed_data.py`) if none exists yet. Swagger UI at `http://localhost:8000/docs`.
 
 ## Authentication
 
-Same hardcoded-client JWT pattern as `p1-doc-intelligence`. Get a token from `/auth/token`:
-
-```bash
-curl -X POST http://localhost:8000/auth/token \
-  -H "Content-Type: application/json" \
-  -d '{"client_id": "client_demo", "client_secret": "demo123"}'
-```
-
-Pass it on every subsequent request: `Authorization: Bearer <jwt>`. Registered clients live in `app/routers/auth.py` — replace with a real client store before production use.
+None — this is a public portfolio demo, not a paid service. Every request is treated as the same shared `demo` client (`app/services/auth_service.py`), so there's no login step and no bearer token required. All visitors share the same seeded demo data; uploading a file adds to that shared account rather than creating a private one.
 
 ## API Reference
 
@@ -121,7 +111,6 @@ Export categorized transactions as a CSV formatted for import into QuickBooks or
 
 | Situation | Status |
 |---|---|
-| Missing/invalid bearer token | `401` |
 | No file, empty file, unsupported extension (not .csv/.xlsx/.xls), missing required column, empty `question`, unsupported export `format`, or `date_from` after `date_to` | `400` |
 | Unparseable file, invalid date/amount/type in a row | `422` |
 | Transaction not found / not owned by caller; no transaction data for a health score; no transactions matching export filters | `404` |
@@ -130,11 +119,11 @@ Export categorized transactions as a CSV formatted for import into QuickBooks or
 
 ## Data model
 
-- **Account** — `id`, `client_id` (owner, from JWT), `name`, `created_at`
+- **Account** — `id`, `client_id` (fixed to `"demo"` — see Authentication above), `name`, `created_at`
 - **Transaction** — `id`, `account_id`, `date`, `description`, `amount`, `type`, `category`, `merchant`, `created_at`
 - **RecurringTransaction** — `id`, `account_id`, `merchant`, `amount` (average), `type`, `frequency`, `occurrence_count`, `last_seen_date`, `next_expected_date`, `total_spent_lifetime`, `transaction_ids`, `detected_at` — replaced wholesale on each `GET /transactions/recurring` call
 - **HealthScoreCache** — `id`, `client_id` (unique), `score`, `breakdown` (JSON), `explanation`, `computed_at` — one row per client, upserted at most once every 24 hours by `GET /insights/health-score`
 
 > **Known data-quality caveat:** `amount` is normalized to a positive magnitude at upload time (`type` is the sole source of direction) as of this table's most recent fix. Rows uploaded *before* that fix may still have signed amounts on `expense` rows, which will skew `/insights/health-score`, `/analytics/*`, and `/export/accounting` for that data until re-uploaded or manually corrected.
 
-All queries are scoped to the authenticated `client_id` via a join through `Account`, so one client can never see another's data.
+All queries are scoped to `client_id` via a join through `Account` — since every request now uses the same shared `"demo"` client_id, all visitors see (and add to) the same dataset.

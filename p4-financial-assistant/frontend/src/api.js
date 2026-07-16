@@ -42,27 +42,22 @@ async function request(path, { token, headers, ...options } = {}) {
   }
 
   if (!res.ok) {
-    let detail = res.statusText;
+    // statusText is always "" over HTTP/2 (used by Vercel/Render), so it
+    // can't be trusted as a fallback — fall back to the status code instead
+    // so a non-JSON error body (e.g. a host's default 502/503 page) never
+    // surfaces as a blank/generic message.
+    let detail = res.statusText || `HTTP ${res.status}`;
     try {
       const body = await res.json();
       detail = body.detail ?? detail;
     } catch {
-      // not JSON, keep statusText
+      // not JSON, keep the fallback above
     }
     throw new ApiError(typeof detail === "string" ? detail : JSON.stringify(detail), res.status);
   }
 
   if (res.status === 204) return null;
   return res.json();
-}
-
-// ── auth ──
-export function login(clientId, clientSecret) {
-  return request("/auth/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ client_id: clientId, client_secret: clientSecret }),
-  });
 }
 
 // ── transactions ──

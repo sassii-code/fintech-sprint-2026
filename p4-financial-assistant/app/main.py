@@ -3,7 +3,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from dotenv import load_dotenv
-from app.models.database import create_tables
+from app.models.database import create_tables, SessionLocal
+from app.seed_data import seed_demo_account
 
 load_dotenv()
 
@@ -24,14 +25,17 @@ app.add_middleware(
 @app.on_event("startup")
 def startup_event():
     create_tables()
+    db = SessionLocal()
+    try:
+        seed_demo_account(db)
+    finally:
+        db.close()
 
-from app.routers import auth
 from app.routers import transactions
 from app.routers import analytics
 from app.routers import insights
 from app.routers import export
 
-app.include_router(auth.router)
 app.include_router(transactions.router)
 app.include_router(analytics.router)
 app.include_router(insights.router)

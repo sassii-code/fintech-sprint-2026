@@ -1,30 +1,16 @@
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext } from "react";
 
-const TOKEN_KEY = "finsight_token";
-const CLIENT_KEY = "finsight_client";
+// Public demo mode: there's no login, so every visitor shares the same fixed
+// identity. The backend ignores the token entirely (app/services/auth_service.py)
+// — it's kept here only because api.js still attaches it as a Bearer header.
+const DEMO_CLIENT_ID = "demo";
+const DEMO_TOKEN = "demo";
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [token, setToken] = useState(() => localStorage.getItem(TOKEN_KEY));
-  const [clientId, setClientId] = useState(() => localStorage.getItem(CLIENT_KEY));
-
-  function login(newToken, newClientId) {
-    localStorage.setItem(TOKEN_KEY, newToken);
-    localStorage.setItem(CLIENT_KEY, newClientId);
-    setToken(newToken);
-    setClientId(newClientId);
-  }
-
-  function logout() {
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(CLIENT_KEY);
-    setToken(null);
-    setClientId(null);
-  }
-
   return (
-    <AuthContext.Provider value={{ token, clientId, isAuthenticated: !!token, login, logout }}>
+    <AuthContext.Provider value={{ token: DEMO_TOKEN, clientId: DEMO_CLIENT_ID }}>
       {children}
     </AuthContext.Provider>
   );

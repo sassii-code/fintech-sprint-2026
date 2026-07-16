@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { Bell, ChevronDown, LogOut, User } from "lucide-react";
+import { Bell, ChevronDown, User } from "lucide-react";
 import { useAuth } from "../AuthContext";
 
 export default function Topbar({ title, accounts = [], selectedAccountId, onSelectAccount }) {
-  const { clientId, logout } = useAuth();
+  const { clientId } = useAuth();
   const [bellOpen, setBellOpen] = useState(false);
   const [avatarOpen, setAvatarOpen] = useState(false);
   const bellRef = useRef(null);
@@ -98,15 +98,8 @@ export default function Topbar({ title, accounts = [], selectedAccountId, onSele
           {avatarOpen && (
             <div className="card fade-in" style={{ position: "absolute", right: 0, top: 40, width: 200, padding: 8, zIndex: 50 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", fontSize: "0.8rem", color: "var(--text-muted)" }}>
-                <User size={14} /> {clientId}
+                <User size={14} /> {clientId} (public demo)
               </div>
-              <button
-                onClick={logout}
-                className="btn btn-ghost"
-                style={{ width: "100%", justifyContent: "flex-start", marginTop: 4, fontSize: "0.82rem" }}
-              >
-                <LogOut size={14} /> Sign out
-              </button>
             </div>
           )}
         </div>
