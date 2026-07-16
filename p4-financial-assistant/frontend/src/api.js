@@ -1,4 +1,12 @@
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+
+if (!API_BASE_URL) {
+  throw new Error(
+    "VITE_API_BASE_URL is not set. Configure it in your .env file (local dev) " +
+    "or in your hosting provider's environment variables (production) — it must " +
+    "point to the backend API URL. There is no localhost fallback."
+  );
+}
 
 export class ApiError extends Error {
   constructor(message, status) {
