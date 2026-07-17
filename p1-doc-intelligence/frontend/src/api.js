@@ -8,13 +8,10 @@ export class ApiError extends Error {
   }
 }
 
-async function request(path, { token, headers, ...options } = {}) {
-  const finalHeaders = new Headers(headers || {});
-  if (token) finalHeaders.set("Authorization", `Bearer ${token}`);
-
+async function request(path, { headers, ...options } = {}) {
   let res;
   try {
-    res = await fetch(`${API_BASE_URL}${path}`, { ...options, headers: finalHeaders });
+    res = await fetch(`${API_BASE_URL}${path}`, { ...options, headers });
   } catch {
     throw new ApiError(`Could not reach the API at ${API_BASE_URL}`, 0);
   }
@@ -86,52 +83,40 @@ const DOC_TYPE_ENDPOINTS = {
   auto: "/extract/auto",
 };
 
-export function login(clientId, clientSecret) {
-  return request("/auth/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ client_id: clientId, client_secret: clientSecret }),
-  });
-}
-
-export function extractCustom(file, fields, token) {
+export function extractCustom(file, fields) {
   const formData = new FormData();
   formData.append("file", file);
   formData.append("fields", Array.isArray(fields) ? fields.join(",") : fields);
-  return request("/extract/custom", { method: "POST", body: formData, token });
+  return request("/extract/custom", { method: "POST", body: formData });
 }
 
-export function extractDocument(docType, file, token, customFields) {
+export function extractDocument(docType, file, customFields) {
   if (docType === "custom") {
-    return extractCustom(file, customFields ?? "", token);
+    return extractCustom(file, customFields ?? "");
   }
   const formData = new FormData();
   formData.append("file", file);
   return request(DOC_TYPE_ENDPOINTS[docType] ?? DOC_TYPE_ENDPOINTS.auto, {
     method: "POST",
     body: formData,
-    token,
   });
 }
 
-export function getHistory(token) {
-  return request("/extract/history", { token });
+export function getHistory() {
+  return request("/extract/history");
 }
 
-export function getExtraction(id, token) {
-  return request(`/extract/history/${id}`, { token });
+export function getExtraction(id) {
+  return request(`/extract/history/${id}`);
 }
 
 // Returns a Blob (an .xlsx file), not JSON — can't go through request().
-export async function exportToExcel(records, token) {
-  const headers = new Headers({ "Content-Type": "application/json" });
-  if (token) headers.set("Authorization", `Bearer ${token}`);
-
+export async function exportToExcel(records) {
   let res;
   try {
     res = await fetch(`${API_BASE_URL}/extract/export`, {
       method: "POST",
-      headers,
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ records }),
     });
   } catch {

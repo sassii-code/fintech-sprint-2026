@@ -24,7 +24,7 @@ cp .env.example .env   # then edit VITE_API_BASE_URL if you're not targeting the
 npm run dev
 ```
 
-Sign in with a client ID/secret registered in the API's `app/routers/auth.py` (e.g. `client_demo` / `demo123` in dev).
+No login step — the app loads straight into the upload interface (public demo, no auth wall on the backend).
 
 ## Environment variables
 

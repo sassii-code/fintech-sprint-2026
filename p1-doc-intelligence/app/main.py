@@ -26,10 +26,8 @@ def startup_event():
     create_tables()
 
 from app.routers import extract
-from app.routers import auth
 
 app.include_router(extract.router)
-app.include_router(auth.router)
 
 ROOT_PAGE = """<!doctype html>
 <html lang="en">
@@ -102,7 +100,7 @@ ROOT_PAGE = """<!doctype html>
   <ul>
     <li>📄 Dedicated + auto-detecting extraction endpoints for resumes, bank statements, and invoices</li>
     <li>🤖 Gemini-powered structured extraction from raw PDF text</li>
-    <li>🔐 JWT-protected API with token issuance via <code>/auth/token</code></li>
+    <li>🌐 Public demo — no login required, every visitor shares the same extraction history</li>
     <li>🗄️ Extraction history persisted to PostgreSQL</li>
     <li>🛡️ Graceful handling of bad PDFs, empty files, and LLM timeouts</li>
   </ul>

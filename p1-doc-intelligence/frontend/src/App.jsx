@@ -3,7 +3,6 @@ import { LayoutGrid, Layers, Zap } from "lucide-react";
 import { extractDocument, getExtraction, getHistory } from "./api";
 import { useToast } from "./ToastContext";
 import { useServerStatus } from "./useServerStatus";
-import LoginBar from "./components/LoginBar";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
 import Dropzone from "./components/Dropzone";
@@ -18,8 +17,6 @@ const ResultsView = lazy(() => import("./components/ResultsView"));
 const BatchResults = lazy(() => import("./components/BatchResults"));
 const HistoryPanel = lazy(() => import("./components/HistoryPanel"));
 
-const TOKEN_KEY = "doc_intel_token";
-
 function PanelSkeleton({ height = 200 }) {
   return (
     <div className="card" style={{ padding: 20 }}>
@@ -31,7 +28,6 @@ function PanelSkeleton({ height = 200 }) {
 function App() {
   const toast = useToast();
   const serverStatus = useServerStatus();
-  const [token, setToken] = useState(() => localStorage.getItem(TOKEN_KEY));
 
   const [mode, setMode] = useState("single"); // "single" | "batch"
   const [docType, setDocType] = useState("auto");
@@ -54,46 +50,23 @@ function App() {
   const [historyError, setHistoryError] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
 
-  const loadHistory = useCallback(
-    async (activeToken) => {
-      const useToken = activeToken ?? token;
-      if (!useToken) return;
-      setHistoryLoading(true);
-      setHistoryError(null);
-      try {
-        const items = await getHistory(useToken);
-        setHistory(items);
-      } catch (err) {
-        if (err.status === 401) {
-          handleLogout();
-          return;
-        }
-        setHistoryError(err.message);
-      } finally {
-        setHistoryLoading(false);
-      }
-    },
-    [token]
-  );
+  const loadHistory = useCallback(async () => {
+    setHistoryLoading(true);
+    setHistoryError(null);
+    try {
+      const items = await getHistory();
+      setHistory(items);
+    } catch (err) {
+      setHistoryError(err.message);
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    if (token) loadHistory(token);
+    loadHistory();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
-
-  function handleAuthenticated(newToken) {
-    localStorage.setItem(TOKEN_KEY, newToken);
-    setToken(newToken);
-    toast("Signed in successfully", "success");
-  }
-
-  function handleLogout() {
-    localStorage.removeItem(TOKEN_KEY);
-    setToken(null);
-    setHistory([]);
-    setResult(null);
-    setSelectedId(null);
-  }
+  }, []);
 
   function handleFileSelected(picked, error) {
     setFile(picked);
@@ -108,22 +81,18 @@ function App() {
   }
 
   async function handleExtract() {
-    if (!file || !token || requiresFields()) return;
+    if (!file || requiresFields()) return;
     setExtracting(true);
     setResultError(null);
     setResult(null);
     setSelectedId(null);
     try {
-      const data = await extractDocument(docType, file, token, customFields);
+      const data = await extractDocument(docType, file, customFields);
       setResult(data);
       setSelectedId(data.id ?? null);
       toast("Extraction complete", "success");
       loadHistory();
     } catch (err) {
-      if (err.status === 401) {
-        handleLogout();
-        return;
-      }
       setResultError(err.message);
       toast(`Extraction failed: ${err.message}`, "error", 5000);
     } finally {
@@ -136,7 +105,7 @@ function App() {
     setResultError(null);
     setExtracting(true);
     try {
-      const data = await getExtraction(id, token);
+      const data = await getExtraction(id);
       setResult(data);
     } catch (err) {
       setResultError(err.message);
@@ -155,7 +124,7 @@ function App() {
   }
 
   async function handleBatchExtract() {
-    if (batchFiles.length === 0 || !token || requiresFields()) return;
+    if (batchFiles.length === 0 || requiresFields()) return;
     setBatchRunning(true);
     const items = batchFiles.map((f) => ({ file: f, status: "queued", data: null, error: null }));
     setBatchItems(items);
@@ -163,13 +132,9 @@ function App() {
     for (let i = 0; i < items.length; i++) {
       setBatchItems((prev) => prev.map((it, idx) => (idx === i ? { ...it, status: "processing" } : it)));
       try {
-        const data = await extractDocument(docType, items[i].file, token, customFields);
+        const data = await extractDocument(docType, items[i].file, customFields);
         setBatchItems((prev) => prev.map((it, idx) => (idx === i ? { ...it, status: "done", data } : it)));
       } catch (err) {
-        if (err.status === 401) {
-          handleLogout();
-          return;
-        }
         setBatchItems((prev) => prev.map((it, idx) => (idx === i ? { ...it, status: "error", error: err.message } : it)));
       }
     }
@@ -179,20 +144,9 @@ function App() {
     loadHistory();
   }
 
-  if (!token) {
-    return (
-      <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
-        <Header authenticated={false} serverStatus={serverStatus} />
-        <div style={{ flex: 1 }}>
-          <LoginBar onAuthenticated={handleAuthenticated} />
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
-      <Header authenticated={!!token} onLogout={handleLogout} serverStatus={serverStatus} />
+      <Header serverStatus={serverStatus} />
 
       <main style={{ flex: 1, maxWidth: 1180, margin: "0 auto", padding: "36px 20px 20px", width: "100%" }}>
         {/* ── hero / upload section ── */}
@@ -276,9 +230,9 @@ function App() {
           <div>
             <Suspense fallback={<PanelSkeleton height={220} />}>
               {mode === "single" ? (
-                <ResultsView loading={extracting} error={resultError} result={result} token={token} />
+                <ResultsView loading={extracting} error={resultError} result={result} />
               ) : (
-                <BatchResults items={batchItems} running={batchRunning} token={token} />
+                <BatchResults items={batchItems} running={batchRunning} />
               )}
             </Suspense>
           </div>

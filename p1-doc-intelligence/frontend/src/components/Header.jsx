@@ -1,8 +1,8 @@
-import { Sparkles, LogOut, BookOpen } from "lucide-react";
+import { Sparkles, BookOpen } from "lucide-react";
 import { API_BASE_URL } from "../api";
 import StatusIndicator from "./StatusIndicator";
 
-export default function Header({ authenticated, onLogout, serverStatus }) {
+export default function Header({ serverStatus }) {
   return (
     <header
       className="fade-in"
@@ -63,12 +63,6 @@ export default function Header({ authenticated, onLogout, serverStatus }) {
             <BookOpen size={14} />
             API Docs
           </a>
-          {authenticated && (
-            <button className="btn btn-ghost" style={{ padding: "8px 14px", fontSize: "0.8rem" }} onClick={onLogout}>
-              <LogOut size={14} />
-              Sign out
-            </button>
-          )}
         </nav>
       </div>
     </header>

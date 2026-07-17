@@ -6,8 +6,6 @@ psycopg2-binary
 pymupdf
 pdfplumber
 google-generativeai
-python-jose[cryptography]
-passlib[bcrypt]
 python-multipart
 python-docx
 Pillow

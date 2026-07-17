@@ -11,7 +11,7 @@ const STATUS_META = {
   error: { label: "Failed", color: "var(--danger)", Icon: XCircle },
 };
 
-export default function BatchResults({ items, running, token }) {
+export default function BatchResults({ items, running }) {
   const toast = useToast();
   const [exporting, setExporting] = useState(false);
 
@@ -35,7 +35,7 @@ export default function BatchResults({ items, running, token }) {
       const records = items
         .filter((i) => i.status === "done")
         .map((i) => ({ filename: i.file.name, doc_type: i.data.doc_type ?? null, extracted_data: i.data.extracted_data }));
-      const blob = await exportToExcel(records, token);
+      const blob = await exportToExcel(records);
       downloadBlob("batch-extraction.xlsx", blob);
       toast("Excel file downloaded", "success");
     } catch (err) {

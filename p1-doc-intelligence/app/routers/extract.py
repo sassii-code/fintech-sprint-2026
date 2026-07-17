@@ -8,8 +8,11 @@ from app.services.llm_service import extract_structured_data, extract_custom_fie
 from app.services.document_service import file_to_text
 from app.services.export_service import build_workbook
 from app.models.database import get_db, Extraction
-from app.services.auth_service import verify_token
-router = APIRouter(prefix="/extract", tags=["extraction"], dependencies=[Depends(verify_token)])
+
+# Public demo mode: no authentication. Every visitor shares the same
+# extraction history (there's no per-user ownership concept in the
+# Extraction model to begin with).
+router = APIRouter(prefix="/extract", tags=["extraction"])
 
 class ExportRecord(BaseModel):
     filename: str

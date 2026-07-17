@@ -41,9 +41,14 @@ None — this is a public portfolio demo, not a paid service. Every request is t
 ## API Reference
 
 ### `POST /transactions/upload`
-Upload a CSV or Excel file of transactions. Required columns (case-insensitive): `date`, `description`, `amount`, `type` (`income` or `expense`). Rows are parsed, categorized in a single batched Gemini call per ≤40 rows (not one call per row), and stored under an account (created if it doesn't exist).
+Upload a CSV, Excel, or PDF file of transactions.
 
-- Body: `multipart/form-data` — `file` (CSV/XLSX), `account_name` (optional, default `"Default Account"`)
+- **CSV/XLSX**: required columns (case-insensitive): `date`, `description`, `amount`, `type` (`income`/`expense`, or `credit`/`debit` as aliases).
+- **PDF**: a bank or card statement. The PDF bytes are sent directly to Gemini (native document understanding, not local OCR/text-extraction) with instructions to extract each transaction's date, description, amount, and type — no fixed column layout required.
+
+Either way, rows are parsed/extracted, categorized in a single batched Gemini call per ≤40 rows (not one call per row), and stored under an account (created if it doesn't exist).
+
+- Body: `multipart/form-data` — `file` (CSV/XLSX/PDF), `account_name` (optional, default `"Default Account"`)
 - Response: `{ account_id, account_name, uploaded_count, transactions: [...] }`, each transaction including its Gemini-assigned `category` (one of `Food`, `Rent`, `Transport`, `Subscriptions`, `Income`, `Shopping`, `Utilities`, `Entertainment`, `Other`) and extracted `merchant` (or `null`).
 
 ### `GET /transactions/accounts`
@@ -111,8 +116,8 @@ Export categorized transactions as a CSV formatted for import into QuickBooks or
 
 | Situation | Status |
 |---|---|
-| No file, empty file, unsupported extension (not .csv/.xlsx/.xls), missing required column, empty `question`, unsupported export `format`, or `date_from` after `date_to` | `400` |
-| Unparseable file, invalid date/amount/type in a row | `422` |
+| No file, empty file, unsupported extension (not .csv/.xlsx/.xls/.pdf), missing required column (CSV/XLSX), empty `question`, unsupported export `format`, or `date_from` after `date_to` | `400` |
+| Unparseable file, invalid date/amount/type in a row, or no transactions extractable from a PDF | `422` |
 | Transaction not found / not owned by caller; no transaction data for a health score; no transactions matching export filters | `404` |
 | Gemini request times out | `504` |
 | Gemini API error (including rate limits) or malformed LLM output (categorization, query answer) | `502` |

@@ -8,7 +8,6 @@
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.139-009688?logo=fastapi&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-SQLAlchemy-336791?logo=postgresql&logoColor=white)
 ![Gemini](https://img.shields.io/badge/Google-Gemini_2.5_Flash-4285F4?logo=googlegemini&logoColor=white)
-![JWT](https://img.shields.io/badge/Auth-JWT-000000?logo=jsonwebtokens&logoColor=white)
 ![Render](https://img.shields.io/badge/Deploy-Render-46E3B7?logo=render&logoColor=white)
 
 [**Live Demo**](https://fintech-sprint-2026.onrender.com) · [API Reference](#api-reference) · [Setup](#setup)
@@ -29,8 +28,8 @@
 - 🧩 **Custom field extraction** — `/extract/custom` lets callers specify exactly which fields to pull out of a document, no fixed schema required
 - 🖼️ **Multi-format ingestion** — PDF, JPG/PNG (transcribed via Gemini's vision capability), DOCX, and TXT all go through the same extraction pipeline
 - 🤖 **LLM-powered** — Gemini 2.5 Flash turns raw document text into structured JSON against a per-document-type (or custom) schema
-- 🔐 **JWT-protected API** — every extraction endpoint requires a bearer token issued via `/auth/token`
-- 🗄️ **Persistent history** — every extraction is saved to PostgreSQL and retrievable via `/extract/history`
+- 🌐 **Public demo, no login** — every extraction endpoint is open; there's no auth wall or per-user account
+- 🗄️ **Shared persistent history** — every extraction is saved to PostgreSQL and retrievable via `/extract/history` (visible to all visitors — there's no per-user ownership)
 - 🛡️ **Resilient by design** — empty files, corrupt files, unsupported formats, LLM timeouts, and malformed LLM output all return clean, typed error responses instead of crashing
 - 💻 **React frontend** — dark glassmorphic UI, drag-and-drop (single or batch) upload, template library, resizable/syntax-highlighted JSON viewer, JSON/CSV/Excel export, live server status; see [`frontend/`](frontend/README.md)
 - ☁️ **Deploy-ready** — `Procfile` + environment-driven config (`$PORT`, `$DATABASE_URL`) for one-click deploy to Render
@@ -42,23 +41,20 @@ flowchart LR
     Client(["Client / React frontend"])
 
     subgraph API["FastAPI app"]
-        Auth["/auth/token\n(JWT issuance)"]
-        Extract["/extract/*\n(JWT-protected)"]
+        Extract["/extract/*\n(public, no auth)"]
         FileToText["file_to_text()\nPDF · image (Gemini vision) · DOCX · TXT"]
     end
 
     Gemini[("Google Gemini\n2.5 Flash")]
     DB[("PostgreSQL\nextractions table")]
 
-    Client -- "1. client_id/secret" --> Auth
-    Auth -- "JWT" --> Client
-    Client -- "2. file + doc_type or custom fields" --> Extract
+    Client -- "1. file + doc_type or custom fields" --> Extract
     Extract --> FileToText
     FileToText -- "raw text" --> Extract
     Extract -- "prompt" --> Gemini
     Gemini -- "structured JSON" --> Extract
     Extract -- "persist" --> DB
-    Extract -- "3. extracted_data" --> Client
+    Extract -- "2. extracted_data" --> Client
 ```
 
 ## Setup
@@ -80,11 +76,9 @@ flowchart LR
    ```
    GEMINI_API_KEY=your-gemini-api-key
    DATABASE_URL=postgresql://user:password@localhost:5432/your_db
-   SECRET_KEY=a-long-random-secret-for-signing-jwts
    ```
    - `GEMINI_API_KEY` — from [Google AI Studio](https://aistudio.google.com/apikey)
    - `DATABASE_URL` — a running PostgreSQL instance; the database itself must already exist. `postgres://` URLs (e.g. from Render) are normalized to `postgresql://` automatically.
-   - `SECRET_KEY` — if omitted, falls back to an insecure hardcoded dev default — always set this outside local dev
 
 4. **Run the server**
    ```bash
@@ -102,35 +96,9 @@ flowchart LR
 
 ## Authentication
 
-All `/extract/*` endpoints require a bearer token. Get one from `/auth/token` using a registered client:
-
-**Request**
-```bash
-curl -X POST http://localhost:8000/auth/token \
-  -H "Content-Type: application/json" \
-  -d '{"client_id": "client_demo", "client_secret": "demo123"}'
-```
-
-**Response**
-```json
-{
-  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "token_type": "bearer",
-  "expires_in": "30 days"
-}
-```
-
-Registered clients are currently hardcoded in `app/routers/auth.py` — replace with a real client store before production use.
-
-Pass the token on every subsequent request:
-```
-Authorization: Bearer <jwt>
-```
+None — this is a public portfolio demo, not a paid service. Every `/extract/*` endpoint is open, with no bearer token or login step required. Since there's no per-user account, extraction history is shared across all visitors (see `GET /extract/history` below).
 
 ## API Reference
-
-### `POST /auth/token`
-Exchange `client_id` / `client_secret` for a JWT (30-day expiry). See [Authentication](#authentication) above.
 
 All `/extract/*` endpoints below accept **PDF, JPG, PNG, DOCX, or TXT** — the file extension determines how text is pulled out (PyMuPDF/pdfplumber for PDF, Gemini vision for images, python-docx for Word, plain decode for text) before it's handed to Gemini for extraction.
 
@@ -140,7 +108,6 @@ Extract raw text from a document — no LLM involved.
 **Request**
 ```bash
 curl -X POST http://localhost:8000/extract/raw-text \
-  -H "Authorization: Bearer $TOKEN" \
   -F "file=@document.pdf"
 ```
 
@@ -159,7 +126,6 @@ Extract structured resume data.
 **Request**
 ```bash
 curl -X POST http://localhost:8000/extract/resume \
-  -H "Authorization: Bearer $TOKEN" \
   -F "file=@resume.pdf"
 ```
 
@@ -240,7 +206,6 @@ Extract an arbitrary, caller-specified set of fields instead of a fixed schema �
 **Request**
 ```bash
 curl -X POST http://localhost:8000/extract/custom \
-  -H "Authorization: Bearer $TOKEN" \
   -F "file=@receipt.jpg" \
   -F "fields=merchant_name, date, total, payment_method"
 ```
@@ -284,7 +249,6 @@ Takes one or more extraction results and returns a formatted `.xlsx` file (neste
 **Request**
 ```bash
 curl -X POST http://localhost:8000/extract/export \
-  -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"records":[{"filename":"invoice.pdf","doc_type":"invoice","extracted_data":{"vendor_name":"Acme","total_amount":542.10}}]}' \
   -o export.xlsx
@@ -298,7 +262,6 @@ Basic liveness check — `{ "api": "ok", "db": "ok", "llm": "ok" }`.
 
 | Situation | Status |
 |---|---|
-| Missing/invalid bearer token | `401` |
 | No file, empty file, unsupported extension, or empty `fields` on `/extract/custom` | `400` |
 | File fails to parse (corrupt/malformed) or has no extractable text | `422` |
 | Extraction record not found (`/history/{id}`) | `404` |
@@ -316,6 +279,6 @@ Basic liveness check — `{ "api": "ok", "db": "ok", "llm": "ok" }`.
 | Excel export | `openpyxl` |
 | LLM extraction | Google Gemini 2.5 Flash |
 | Database | PostgreSQL via SQLAlchemy |
-| Auth | JWT (`python-jose`) + `passlib` |
+| Auth | None — public demo |
 | Frontend | React + Vite (see [`frontend/`](frontend/README.md)) |
 | Deployment | Render (`Procfile`, env-driven config) |

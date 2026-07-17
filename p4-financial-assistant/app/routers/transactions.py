@@ -41,9 +41,11 @@ async def upload_transactions(
     db: Session = Depends(get_db),
     token: dict = Depends(verify_token),
 ):
-    """Upload a CSV or Excel file of transactions (date, description, amount,
-    type columns) and get back each one auto-categorized by Gemini, stored
-    under the given (or default) account."""
+    """Upload a CSV, Excel, or PDF (bank/card statement) file of transactions
+    and get back each one auto-categorized by Gemini, stored under the given
+    (or default) account. CSV/Excel need date, description, amount, type
+    columns; a PDF's line items are extracted directly by Gemini's document
+    understanding instead."""
     client_id = token["client_id"]
     rows = await parse_transaction_file(file)
     categorized = categorize_transactions(rows)

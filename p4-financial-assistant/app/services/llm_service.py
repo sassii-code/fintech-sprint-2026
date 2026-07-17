@@ -81,6 +81,36 @@ def categorize_transactions(rows: list[dict]) -> list[dict]:
         results.extend(_categorize_batch(chunk))
     return results
 
+def extract_transactions_from_pdf(pdf_bytes: bytes) -> list[dict]:
+    """Uses Gemini's native document understanding (the PDF bytes are sent
+    directly as a multimodal part, not pre-extracted to text locally) to pull
+    transaction line items out of a bank/card statement PDF."""
+    prompt = (
+        "You are analyzing a bank or credit card statement PDF. Extract every individual "
+        "transaction line item you can find in the statement (ignore headers, running "
+        "balances, summaries, and marketing content).\n\n"
+        "For each transaction, extract:\n"
+        "- date: the transaction date, normalized to YYYY-MM-DD\n"
+        "- description: the transaction description/merchant text as it appears on the statement\n"
+        "- amount: the transaction amount as a positive number (magnitude only — no currency symbols, commas, or minus signs)\n"
+        '- type: "income" for money coming in (deposits, credits, refunds, payroll) or "expense" for money going out '
+        "(purchases, debits, fees, withdrawals)\n\n"
+        'Return ONLY a valid JSON array of objects shaped like {"date": "YYYY-MM-DD", "description": "...", '
+        '"amount": 12.34, "type": "income" | "expense"}, in the order they appear in the statement. '
+        "No markdown, no backticks, no commentary. If no transactions can be found, return an empty array []."
+    )
+
+    result = _strip_markdown_json(_generate([prompt, {"mime_type": "application/pdf", "data": pdf_bytes}]))
+    try:
+        parsed = json.loads(result)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=502, detail="LLM returned invalid JSON while extracting transactions from the PDF")
+
+    if not isinstance(parsed, list):
+        raise HTTPException(status_code=502, detail="LLM returned an unexpected response shape while extracting transactions from the PDF")
+
+    return parsed
+
 def generate_insights(summary: dict) -> str:
     prompt = (
         "You are a personal finance assistant. Based on this JSON summary of the user's recent transactions "

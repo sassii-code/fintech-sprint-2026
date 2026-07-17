@@ -6,7 +6,7 @@ import { useToast } from "../ToastContext";
 import JsonView from "./JsonView";
 import LoadingIndicator from "./LoadingIndicator";
 
-export default function ResultsView({ loading, error, result, token }) {
+export default function ResultsView({ loading, error, result }) {
   const toast = useToast();
   const [copied, setCopied] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -59,8 +59,7 @@ export default function ResultsView({ loading, error, result, token }) {
     setExporting(true);
     try {
       const blob = await exportToExcel(
-        [{ filename: result.filename || "extraction", doc_type: result.doc_type ?? null, extracted_data: dataObject }],
-        token
+        [{ filename: result.filename || "extraction", doc_type: result.doc_type ?? null, extracted_data: dataObject }]
       );
       downloadBlob(`${result.filename || "extraction"}.xlsx`, blob);
       toast("Excel file downloaded", "success");

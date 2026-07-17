@@ -4,8 +4,8 @@ import { useAuth } from "../AuthContext";
 import { useToast } from "../ToastContext";
 import { uploadTransactions } from "../api";
 
-const ACCEPT_ATTR = ".csv,.xlsx,.xls,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-const ACCEPTED_EXT = [".csv", ".xlsx", ".xls"];
+const ACCEPT_ATTR = ".csv,.xlsx,.xls,.pdf,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/pdf";
+const ACCEPTED_EXT = [".csv", ".xlsx", ".xls", ".pdf"];
 
 function extensionOf(name) {
   const i = name.lastIndexOf(".");
@@ -122,7 +122,7 @@ export default function UploadPage() {
             <>
               <div style={{ fontWeight: 700 }}>{dragging ? "Drop it here" : "Drag & drop your transactions file"}</div>
               <div style={{ color: "var(--text-faint)", fontSize: "0.8rem", marginTop: 4 }}>
-                or click to browse — CSV, XLSX, XLS
+                or click to browse — CSV, XLSX, XLS, PDF
               </div>
             </>
           )}
